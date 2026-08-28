@@ -15,18 +15,26 @@ setup connection:
 verify connection:
   snow sql -c {{connection}} -q "SHOW ROLES LIKE 'KS_%'; SHOW GRANTS OF ROLE KS_STREAMLIT_VIEWER; SHOW GRANTS TO ROLE KS_APP_ADMIN;"
 
-# Owner's-vs-caller's-rights demo: build the data layer (sales table, user->region
-# map, row access policy) and the caller grants. Run after `setup`.
+# Build PROD.DATA as the source of truth: sales table, entitlement map, row
+# access + masking policies, and caller grants. Data DDL is parametrized by
+# environment (<% db %> / <% owner_role %>).
 
-data connection:
-  snow sql -c {{connection}} -f sql/10_demo_data/01_sales_table.sql
-  snow sql -c {{connection}} -f sql/10_demo_data/02_user_region_map.sql
-  snow sql -c {{connection}} -f sql/10_demo_data/03_row_access_policy.sql
-  snow sql -c {{connection}} -f sql/10_demo_data/04_masking_policy.sql
-  snow sql -c {{connection}} -f sql/20_caller_grants/01_caller_grants.sql
+data-prod connection:
+  snow sql -c {{connection}} -D db=KITCHEN_SINK_PROD -D owner_role=KS_APP_OWNER_PROD -f sql/10_demo_data/01_sales_table.sql
+  snow sql -c {{connection}} -D db=KITCHEN_SINK_PROD -D owner_role=KS_APP_OWNER_PROD -f sql/10_demo_data/02_user_region_map.sql
+  snow sql -c {{connection}} -D db=KITCHEN_SINK_PROD -D owner_role=KS_APP_OWNER_PROD -f sql/10_demo_data/03_row_access_policy.sql
+  snow sql -c {{connection}} -D db=KITCHEN_SINK_PROD -D owner_role=KS_APP_OWNER_PROD -f sql/10_demo_data/04_masking_policy.sql
+  snow sql -c {{connection}} -D db=KITCHEN_SINK_PROD -D owner_role=KS_APP_OWNER_PROD -f sql/20_caller_grants/01_caller_grants.sql
 
-# Deploy the Streamlit app as the dev owner role so its owner's-rights view
-# matches the row access policy, then share it via the broad entry role.
+# Refresh DEV.DATA as a zero-copy clone of PROD.DATA (data comes down), then
+# re-apply what a clone doesn't carry (ownership, container grants, caller grants).
+
+clone-dev connection:
+  snow sql -c {{connection}} -f sql/25_env_refresh/clone_dev.sql
+
+# Deploy the Streamlit app to DEV as the dev owner role, attach the PyPI mirror,
+# and share it via the broad entry role. The app is environment-aware, so the
+# same artifact is promoted to prod by CI/CD.
 
 deploy connection:
   cd app && snow streamlit deploy rights_demo -c {{connection}} --role KS_APP_DEVELOPER --replace
