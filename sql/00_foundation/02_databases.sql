@@ -3,70 +3,83 @@
  * Phase 1 · 02_databases.sql  —  Dev / Prod databases and schemas
  * ============================================================================
  *
- * Two databases in one account model the promotion story (Phase 3):
- *   KITCHEN_SINK_DEV.APPS    development
- *   KITCHEN_SINK_PROD.APPS   production
+ * Two databases model the environments; each has two schemas with different
+ * lifecycles:
  *
- * SYSADMIN owns the objects. We then hand ownership of each APPS schema to the
- * role responsible for that environment so app objects created there are owned
- * by the right functional role (not by a person).
+ *   <db>.DATA   business data + governance (table, entitlement map, policies).
+ *              PROD.DATA is the source of truth, built by the data DDL.
+ *              DEV.DATA is a zero-copy clone of PROD.DATA (see the clone recipe).
+ *   <db>.APPS   the Streamlit app object. Promoted dev -> prod by CI/CD, never
+ *              cloned (so its ownership stays aligned with the policies).
  *
- * Idempotent: CREATE ... IF NOT EXISTS; GRANTs are no-ops if already present.
+ * "Code goes up, data comes down": the app promotes dev -> prod; data clones
+ * prod -> dev.
+ *
+ * SYSADMIN owns the objects, then hands each schema to the role responsible for
+ * that environment. Idempotent.
  * ============================================================================
  */
 
 USE ROLE SYSADMIN;
 
--- ---------------------------------------------------------------------------
--- Databases + schemas
--- ---------------------------------------------------------------------------
-CREATE DATABASE IF NOT EXISTS KITCHEN_SINK_DEV
-  COMMENT = 'Kitchen Sink — development environment';
-CREATE DATABASE IF NOT EXISTS KITCHEN_SINK_PROD
-  COMMENT = 'Kitchen Sink — production environment';
+CREATE DATABASE IF NOT EXISTS KITCHEN_SINK_DEV  COMMENT = 'Kitchen Sink — development';
+CREATE DATABASE IF NOT EXISTS KITCHEN_SINK_PROD COMMENT = 'Kitchen Sink — production';
 
-CREATE SCHEMA IF NOT EXISTS KITCHEN_SINK_DEV.APPS
-  COMMENT = 'Streamlit apps + demo data (dev)';
-CREATE SCHEMA IF NOT EXISTS KITCHEN_SINK_PROD.APPS
-  COMMENT = 'Streamlit apps (prod)';
-
--- Drop the default PUBLIC schema noise is optional; we leave it in place.
+CREATE SCHEMA IF NOT EXISTS KITCHEN_SINK_DEV.DATA  COMMENT = 'Business data + governance (dev; cloned from prod)';
+CREATE SCHEMA IF NOT EXISTS KITCHEN_SINK_DEV.APPS  COMMENT = 'Streamlit app (dev)';
+CREATE SCHEMA IF NOT EXISTS KITCHEN_SINK_PROD.DATA COMMENT = 'Business data + governance (prod; source of truth)';
+CREATE SCHEMA IF NOT EXISTS KITCHEN_SINK_PROD.APPS COMMENT = 'Streamlit app (prod)';
 
 -- ---------------------------------------------------------------------------
--- Environment ownership
---
--- DEV APPS  -> KS_APP_DEVELOPER  (developer owns/creates dev apps)
--- PROD APPS -> KS_APP_OWNER_PROD (prod app owned by a dedicated prod role)
---
--- REVOKE CURRENT GRANTS ... COPY CURRENT GRANTS keeps existing grants intact
--- and is safe to re-run.
+-- Ownership follows the environment (SECURITYADMIN manages grants)
 -- ---------------------------------------------------------------------------
 USE ROLE SECURITYADMIN;
 
-GRANT OWNERSHIP ON SCHEMA KITCHEN_SINK_DEV.APPS
-  TO ROLE KS_APP_DEVELOPER COPY CURRENT GRANTS;
-GRANT OWNERSHIP ON SCHEMA KITCHEN_SINK_PROD.APPS
-  TO ROLE KS_APP_OWNER_PROD COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON SCHEMA KITCHEN_SINK_DEV.DATA  TO ROLE KS_APP_DEVELOPER  COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON SCHEMA KITCHEN_SINK_DEV.APPS  TO ROLE KS_APP_DEVELOPER  COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON SCHEMA KITCHEN_SINK_PROD.DATA TO ROLE KS_APP_OWNER_PROD COPY CURRENT GRANTS;
+GRANT OWNERSHIP ON SCHEMA KITCHEN_SINK_PROD.APPS TO ROLE KS_APP_OWNER_PROD COPY CURRENT GRANTS;
 
--- Database USAGE so roles can navigate into their schemas.
+-- ---------------------------------------------------------------------------
+-- Database USAGE
+-- ---------------------------------------------------------------------------
+-- Env owners + the CI deployer
 GRANT USAGE ON DATABASE KITCHEN_SINK_DEV  TO ROLE KS_APP_DEVELOPER;
 GRANT USAGE ON DATABASE KITCHEN_SINK_DEV  TO ROLE KS_APP_DEPLOYER;
 GRANT USAGE ON DATABASE KITCHEN_SINK_PROD TO ROLE KS_APP_OWNER_PROD;
 GRANT USAGE ON DATABASE KITCHEN_SINK_PROD TO ROLE KS_APP_DEPLOYER;
+-- Business roles + the broad viewer role reach both environments
+GRANT USAGE ON DATABASE KITCHEN_SINK_DEV  TO ROLE KS_SALES_EAST;
+GRANT USAGE ON DATABASE KITCHEN_SINK_DEV  TO ROLE KS_SALES_WEST;
+GRANT USAGE ON DATABASE KITCHEN_SINK_DEV  TO ROLE KS_SALES_LEADERSHIP;
+GRANT USAGE ON DATABASE KITCHEN_SINK_DEV  TO ROLE KS_STREAMLIT_VIEWER;
+GRANT USAGE ON DATABASE KITCHEN_SINK_PROD TO ROLE KS_SALES_EAST;
+GRANT USAGE ON DATABASE KITCHEN_SINK_PROD TO ROLE KS_SALES_WEST;
+GRANT USAGE ON DATABASE KITCHEN_SINK_PROD TO ROLE KS_SALES_LEADERSHIP;
+GRANT USAGE ON DATABASE KITCHEN_SINK_PROD TO ROLE KS_STREAMLIT_VIEWER;
 
--- Business/data roles need USAGE on the dev db/schema to reach the sales
--- table. The SELECT grant, the user->region mapping table, and the row access
--- policy all live in Phase 2 (sql/10_demo_data + sql/20_caller_grants),
--- alongside the objects they govern.
-GRANT USAGE ON DATABASE KITCHEN_SINK_DEV TO ROLE KS_SALES_EAST;
-GRANT USAGE ON DATABASE KITCHEN_SINK_DEV TO ROLE KS_SALES_WEST;
-GRANT USAGE ON DATABASE KITCHEN_SINK_DEV TO ROLE KS_SALES_LEADERSHIP;
-GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.APPS TO ROLE KS_SALES_EAST;
-GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.APPS TO ROLE KS_SALES_WEST;
-GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.APPS TO ROLE KS_SALES_LEADERSHIP;
+-- ---------------------------------------------------------------------------
+-- DATA schema USAGE — business roles hold object access here; the row access
+-- policy governs which rows they actually see. (SELECT on the table is granted
+-- by the data DDL.) Container grants do NOT survive a clone, so the clone
+-- recipe re-applies the DEV.DATA grants after refreshing it from prod.
+-- ---------------------------------------------------------------------------
+GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.DATA  TO ROLE KS_SALES_EAST;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.DATA  TO ROLE KS_SALES_WEST;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.DATA  TO ROLE KS_SALES_LEADERSHIP;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.DATA  TO ROLE KS_APP_DEPLOYER;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_PROD.DATA TO ROLE KS_SALES_EAST;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_PROD.DATA TO ROLE KS_SALES_WEST;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_PROD.DATA TO ROLE KS_SALES_LEADERSHIP;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_PROD.DATA TO ROLE KS_APP_DEPLOYER;
 
--- The deployer needs to create Streamlit objects in both environments.
+-- ---------------------------------------------------------------------------
+-- APPS schema — the CI deployer creates the Streamlit object; the broad viewer
+-- role needs schema USAGE to open apps in either environment.
+-- ---------------------------------------------------------------------------
 GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.APPS  TO ROLE KS_APP_DEPLOYER;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_DEV.APPS  TO ROLE KS_STREAMLIT_VIEWER;
 GRANT USAGE ON SCHEMA KITCHEN_SINK_PROD.APPS TO ROLE KS_APP_DEPLOYER;
+GRANT USAGE ON SCHEMA KITCHEN_SINK_PROD.APPS TO ROLE KS_STREAMLIT_VIEWER;
 GRANT CREATE STREAMLIT ON SCHEMA KITCHEN_SINK_DEV.APPS  TO ROLE KS_APP_DEPLOYER;
 GRANT CREATE STREAMLIT ON SCHEMA KITCHEN_SINK_PROD.APPS TO ROLE KS_APP_DEPLOYER;
