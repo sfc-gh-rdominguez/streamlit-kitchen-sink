@@ -48,3 +48,16 @@ USE ROLE ACCOUNTADMIN;
 GRANT USAGE ON COMPUTE POOL SYSTEM_COMPUTE_POOL_CPU TO ROLE KS_APP_DEVELOPER;
 GRANT USAGE ON COMPUTE POOL SYSTEM_COMPUTE_POOL_CPU TO ROLE KS_APP_DEPLOYER;
 GRANT USAGE ON COMPUTE POOL SYSTEM_COMPUTE_POOL_CPU TO ROLE KS_APP_OWNER_PROD;
+
+-- ---------------------------------------------------------------------------
+-- Container-runtime package resolution
+--
+-- A container-runtime Streamlit app must declare its dependencies in a
+-- pyproject.toml, and those packages are resolved from an attached artifact
+-- repository. Granting the built-in Snowflake PyPI mirror role lets the app
+-- owner roles attach snowflake.snowpark.pypi_shared_repository (no external
+-- access integration or internet required). The app itself is attached to the
+-- repository at deploy time (see the justfile `deploy` recipe).
+-- ---------------------------------------------------------------------------
+GRANT DATABASE ROLE SNOWFLAKE.PYPI_REPOSITORY_USER TO ROLE KS_APP_DEVELOPER;
+GRANT DATABASE ROLE SNOWFLAKE.PYPI_REPOSITORY_USER TO ROLE KS_APP_OWNER_PROD;

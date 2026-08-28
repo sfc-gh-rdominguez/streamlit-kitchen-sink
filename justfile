@@ -29,7 +29,7 @@ data connection:
 
 deploy connection:
   cd app && snow streamlit deploy rights_demo -c {{connection}} --role KS_APP_DEVELOPER --replace
-  snow sql -c {{connection}} -q "USE ROLE KS_APP_DEVELOPER; GRANT USAGE ON STREAMLIT KITCHEN_SINK_DEV.APPS.KITCHEN_SINK_RIGHTS_DEMO TO ROLE KS_STREAMLIT_VIEWER;"
+  snow sql -c {{connection}} -q "USE ROLE KS_APP_DEVELOPER; ALTER STREAMLIT KITCHEN_SINK_DEV.APPS.KITCHEN_SINK_RIGHTS_DEMO SET ARTIFACT_REPOSITORIES = ('snowflake.snowpark.pypi_shared_repository'); GRANT USAGE ON STREAMLIT KITCHEN_SINK_DEV.APPS.KITCHEN_SINK_RIGHTS_DEMO TO ROLE KS_STREAMLIT_VIEWER;"
 
 # WARNING: drops the KITCHEN_SINK databases, the KS_WH warehouse, and every KS_*
 # role. There is no undo.

@@ -52,6 +52,12 @@ otherwise uses only the viewer's *default* role.
   `CURRENT_USER()` + row access policies inside SiS.
 - `MANAGE CALLER GRANTS` delegated to `KS_APP_ADMIN`, which grants the caller
   privileges to the owner role.
+- A container-runtime app must declare dependencies in a `pyproject.toml`, and
+  those packages resolve from an attached artifact repository. This repo uses the
+  built-in Snowflake PyPI mirror (`snowflake.snowpark.pypi_shared_repository`) —
+  granted to the owner role in foundation SQL and attached at deploy time — so
+  `streamlit>=1.53.1` (needed for caller's rights) installs with no external
+  access integration or internet.
 
 ## Build it
 
