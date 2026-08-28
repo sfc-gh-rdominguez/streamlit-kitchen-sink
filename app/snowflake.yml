@@ -1,0 +1,16 @@
+definition_version: 2
+entities:
+  rights_demo:
+    type: streamlit
+    identifier:
+      name: KITCHEN_SINK_RIGHTS_DEMO
+      database: KITCHEN_SINK_DEV
+      schema: APPS
+    query_warehouse: KS_WH
+    runtime_name: SYSTEM$ST_CONTAINER_RUNTIME_PY3_11
+    compute_pool: SYSTEM_COMPUTE_POOL_CPU
+    main_file: streamlit_app.py
+    # Only pre-installed packages (streamlit) are used, so no pyproject.toml and
+    # no external access integration are needed.
+    artifacts:
+      - streamlit_app.py
