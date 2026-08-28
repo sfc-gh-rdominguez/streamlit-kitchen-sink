@@ -1,30 +1,35 @@
 /*
  * ============================================================================
- * Phase 1 · 01_roles.sql  —  Dedicated role hierarchy for Streamlit apps
+ * Phase 1 · 01_roles.sql  —  Role hierarchy for Streamlit apps
  * ============================================================================
  *
- * Teaching point: use FUNCTIONAL, dedicated roles — never tie app privileges
- * to a person's default role. This is the foundation the caller's-vs-owner's
- * rights demo (Phase 2) and the CI/CD promotion (Phase 3) both build on.
+ * Two independent layers, plus the build/deploy roles:
  *
- * RBAC separation of duties (Snowflake best practice):
- *   - USERADMIN     creates roles
- *   - SECURITYADMIN grants roles to roles (builds the hierarchy)
- *   - SYSADMIN      owns databases/warehouses (see 02/03)
+ *   1. APP ENTRY (broad, flat, reused across apps)
+ *      KS_STREAMLIT_VIEWER  ->  granted to PUBLIC. Its only job is "you may
+ *      open Streamlit apps." Every app grants USAGE ON STREAMLIT to this role,
+ *      so you never create a per-app viewer role. What a user actually SEES is
+ *      governed at the data layer, not here.
  *
- * Idempotent: safe to re-run. Role-to-role GRANTs are no-ops if already present.
+ *   2. DATA / BUSINESS ROLES (foundational functional roles)
+ *      KS_SALES_EAST / KS_SALES_WEST / KS_SALES_LEADERSHIP. These carry the
+ *      SELECT grants on business data and represent job functions that already
+ *      exist in a real org. Row-level visibility is enforced by a row access
+ *      policy (see Phase 2), so these roles gate OBJECT access while the policy
+ *      governs ROWS.
  *
- * Role map
- * --------
- *   KS_APP_ADMIN        Top governance role. Inherits every role below, so an
- *                       operator using it can create, deploy, own, and test-view
- *                       apps. Granted up to SYSADMIN.
- *   KS_APP_DEVELOPER    Creator / owner of the DEV app. CREATE STREAMLIT in dev.
- *   KS_APP_DEPLOYER     CI/CD service role. Deploys to dev and prod (Phase 3).
- *   KS_APP_OWNER_PROD   Owns the PROD app object.
- *   KS_VIEWER_EAST      End-user viewer, scoped to the EAST region (Phase 2 RAP).
- *   KS_VIEWER_WEST      End-user viewer, scoped to the WEST region (Phase 2 RAP).
- *   KS_VIEWER_ALL       End-user viewer with account-wide visibility.
+ *   3. BUILD / DEPLOY / OWNERSHIP
+ *      KS_APP_ADMIN (governance; inherits the roles below for testing),
+ *      KS_APP_DEVELOPER (dev app owner), KS_APP_DEPLOYER (CI/CD service role),
+ *      KS_APP_OWNER_PROD (prod app owner).
+ *
+ * Key idea: entry is broad; data RBAC keeps users seeing only what they may.
+ * That separation is only SAFE for an app running with restricted caller's
+ * rights (Phase 2) -- an owner's-rights app shared to KS_STREAMLIT_VIEWER shows
+ * every viewer the owner's full data.
+ *
+ * RBAC separation of duties: USERADMIN creates roles, SECURITYADMIN grants,
+ * SYSADMIN owns objects (02/03). Idempotent: safe to re-run.
  * ============================================================================
  */
 
@@ -33,42 +38,53 @@
 -- ---------------------------------------------------------------------------
 USE ROLE USERADMIN;
 
+-- Build / deploy / ownership
 CREATE ROLE IF NOT EXISTS KS_APP_ADMIN
-  COMMENT = 'Kitchen Sink: top governance role; inherits all app roles';
+  COMMENT = 'Kitchen Sink: governance role; inherits build/deploy + business roles';
 CREATE ROLE IF NOT EXISTS KS_APP_DEVELOPER
   COMMENT = 'Kitchen Sink: creates/owns the DEV Streamlit app';
 CREATE ROLE IF NOT EXISTS KS_APP_DEPLOYER
   COMMENT = 'Kitchen Sink: CI/CD service role; deploys dev and prod';
 CREATE ROLE IF NOT EXISTS KS_APP_OWNER_PROD
   COMMENT = 'Kitchen Sink: owns the PROD Streamlit app';
-CREATE ROLE IF NOT EXISTS KS_VIEWER_EAST
-  COMMENT = 'Kitchen Sink: end-user viewer scoped to EAST region';
-CREATE ROLE IF NOT EXISTS KS_VIEWER_WEST
-  COMMENT = 'Kitchen Sink: end-user viewer scoped to WEST region';
-CREATE ROLE IF NOT EXISTS KS_VIEWER_ALL
-  COMMENT = 'Kitchen Sink: end-user viewer with account-wide visibility';
+
+-- Broad app-entry role (reused across all apps)
+CREATE ROLE IF NOT EXISTS KS_STREAMLIT_VIEWER
+  COMMENT = 'Kitchen Sink: broad app-entry role; USAGE on apps only, no data grants';
+
+-- Foundational business / data roles (job functions; carry data SELECT grants)
+CREATE ROLE IF NOT EXISTS KS_SALES_EAST
+  COMMENT = 'Kitchen Sink: business role — East region sales';
+CREATE ROLE IF NOT EXISTS KS_SALES_WEST
+  COMMENT = 'Kitchen Sink: business role — West region sales';
+CREATE ROLE IF NOT EXISTS KS_SALES_LEADERSHIP
+  COMMENT = 'Kitchen Sink: business role — sales leadership (all regions)';
 
 -- ---------------------------------------------------------------------------
 -- Build the hierarchy (SECURITYADMIN owns role grants)
---
--- Granting a child role TO a parent lets the parent inherit the child's
--- privileges. We roll everything up to KS_APP_ADMIN, then KS_APP_ADMIN up to
--- SYSADMIN so the standard admin hierarchy stays intact.
 -- ---------------------------------------------------------------------------
 USE ROLE SECURITYADMIN;
 
+-- Build/deploy roles roll up to the governance role.
 GRANT ROLE KS_APP_DEVELOPER  TO ROLE KS_APP_ADMIN;
 GRANT ROLE KS_APP_DEPLOYER   TO ROLE KS_APP_ADMIN;
 GRANT ROLE KS_APP_OWNER_PROD TO ROLE KS_APP_ADMIN;
-GRANT ROLE KS_VIEWER_EAST    TO ROLE KS_APP_ADMIN;
-GRANT ROLE KS_VIEWER_WEST    TO ROLE KS_APP_ADMIN;
-GRANT ROLE KS_VIEWER_ALL     TO ROLE KS_APP_ADMIN;
+
+-- Business roles also roll up to the governance role so an operator can
+-- test-view the app as any region. (SYSADMIN inherits them transitively via
+-- KS_APP_ADMIN below, keeping the standard admin hierarchy intact.)
+GRANT ROLE KS_SALES_EAST       TO ROLE KS_APP_ADMIN;
+GRANT ROLE KS_SALES_WEST       TO ROLE KS_APP_ADMIN;
+GRANT ROLE KS_SALES_LEADERSHIP TO ROLE KS_APP_ADMIN;
 
 GRANT ROLE KS_APP_ADMIN TO ROLE SYSADMIN;
 
+-- App entry is broad: everyone may open Streamlit apps.
+GRANT ROLE KS_STREAMLIT_VIEWER TO ROLE PUBLIC;
+
 -- ---------------------------------------------------------------------------
--- Grant the roles to the current operator so you can assume/test them.
--- Replace CURRENT_USER() usage below if setting up for another operator.
+-- Grant the governance role to the current operator so you can assume/test
+-- every role above. Replace CURRENT_USER() if setting up for someone else.
 -- ---------------------------------------------------------------------------
 SET operator = CURRENT_USER();
 GRANT ROLE KS_APP_ADMIN TO USER IDENTIFIER($operator);

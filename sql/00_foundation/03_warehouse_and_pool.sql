@@ -26,14 +26,16 @@ CREATE WAREHOUSE IF NOT EXISTS KS_WH
   INITIALLY_SUSPENDED = TRUE
   COMMENT = 'Kitchen Sink — shared query warehouse for Streamlit apps';
 
--- Warehouse USAGE for every role that runs queries (developer, deployer,
--- prod owner, and all viewers). OPERATE lets a role resume/suspend if needed.
+-- Warehouse USAGE for every role that runs queries. Build roles run the app;
+-- business roles get USAGE too so you can assume them in a worksheet to test
+-- the row access policy directly. KS_STREAMLIT_VIEWER does NOT get warehouse
+-- USAGE: it only opens apps, which run on the app's owner-provisioned warehouse.
 GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_APP_DEVELOPER;
 GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_APP_DEPLOYER;
 GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_APP_OWNER_PROD;
-GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_VIEWER_EAST;
-GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_VIEWER_WEST;
-GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_VIEWER_ALL;
+GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_SALES_EAST;
+GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_SALES_WEST;
+GRANT USAGE ON WAREHOUSE KS_WH TO ROLE KS_SALES_LEADERSHIP;
 
 -- ---------------------------------------------------------------------------
 -- Compute pool USAGE (ACCOUNTADMIN grants on the system pool)
