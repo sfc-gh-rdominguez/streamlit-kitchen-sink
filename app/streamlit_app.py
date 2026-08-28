@@ -35,6 +35,10 @@ try:
     # table — caller's rights is an intersection of the viewer's privileges and
     # the owner's caller grants. ttl=0 keeps this session-scoped (never cached).
     caller_conn.query("USE SECONDARY ROLES ALL", ttl=0)
+    # The caller's-rights session has no warehouse selected (unlike the
+    # owner's-rights connection, which uses the app's QUERY_WAREHOUSE). Select
+    # one the viewer can use.
+    caller_conn.query("USE WAREHOUSE KS_WH", ttl=0)
 except Exception as exc:  # noqa: BLE001 — surface any wiring issue in the UI
     caller_error = str(exc)
 
