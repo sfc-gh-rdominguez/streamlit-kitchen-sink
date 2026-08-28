@@ -1,0 +1,10 @@
+[project]
+name = "kitchen-sink-rights-demo"
+version = "0.1.0"
+requires-python = ">=3.11"
+# The container runtime requires a dependency file. This app only uses packages
+# already pre-installed in the runtime (streamlit, snowflake-snowpark-python),
+# so the dependency list is intentionally empty: nothing is fetched from a
+# package index, and no artifact repository or external access integration is
+# needed.
+dependencies = []

@@ -10,7 +10,9 @@ entities:
     runtime_name: SYSTEM$ST_CONTAINER_RUNTIME_PY3_11
     compute_pool: SYSTEM_COMPUTE_POOL_CPU
     main_file: streamlit_app.py
-    # Only pre-installed packages (streamlit) are used, so no pyproject.toml and
-    # no external access integration are needed.
+    # The container runtime requires a dependency file. pyproject.toml here has
+    # empty dependencies (uses only pre-installed packages), so no external
+    # access integration is needed.
     artifacts:
       - streamlit_app.py
+      - pyproject.toml
