@@ -2,51 +2,78 @@
 
 This is the foundation the other patterns build on. It answers a common question:
 **what's the best way to share and govern Streamlit in Snowflake apps?** The answer
-is *dedicated, functional roles* plus a clean split between development and
-production — never app privileges pinned to a person's default role.
+separates two concerns that are easy to conflate:
 
-## The role model
+- **App access** — who may *open* an app. Keep this broad and reuse it across apps.
+- **Data access** — what a user *sees inside*. Govern this with your existing
+  business roles and row-level security, not with per-app roles.
+
+## Two layers, one hierarchy
 
 ```mermaid
 graph TD
     SYSADMIN --> KS_APP_ADMIN
-    KS_APP_ADMIN --> KS_APP_DEVELOPER["KS_APP_DEVELOPER<br/>creates/owns the DEV app"]
-    KS_APP_ADMIN --> KS_APP_DEPLOYER["KS_APP_DEPLOYER<br/>CI/CD service role"]
-    KS_APP_ADMIN --> KS_APP_OWNER_PROD["KS_APP_OWNER_PROD<br/>owns the PROD app"]
-    KS_APP_ADMIN --> KS_VIEWER_EAST["KS_VIEWER_EAST<br/>end-user viewer (EAST)"]
-    KS_APP_ADMIN --> KS_VIEWER_WEST["KS_VIEWER_WEST<br/>end-user viewer (WEST)"]
-    KS_APP_ADMIN --> KS_VIEWER_ALL["KS_VIEWER_ALL<br/>end-user viewer (all regions)"]
+
+    subgraph build["Build / deploy / ownership"]
+        KS_APP_DEVELOPER["KS_APP_DEVELOPER<br/>creates/owns the DEV app"]
+        KS_APP_DEPLOYER["KS_APP_DEPLOYER<br/>CI/CD service role"]
+        KS_APP_OWNER_PROD["KS_APP_OWNER_PROD<br/>owns the PROD app"]
+    end
+
+    subgraph data["Data / business roles (row-level governance)"]
+        KS_SALES_EAST["KS_SALES_EAST"]
+        KS_SALES_WEST["KS_SALES_WEST"]
+        KS_SALES_LEADERSHIP["KS_SALES_LEADERSHIP"]
+    end
+
+    KS_APP_ADMIN --> KS_APP_DEVELOPER
+    KS_APP_ADMIN --> KS_APP_DEPLOYER
+    KS_APP_ADMIN --> KS_APP_OWNER_PROD
+    KS_APP_ADMIN --> KS_SALES_EAST
+    KS_APP_ADMIN --> KS_SALES_WEST
+    KS_APP_ADMIN --> KS_SALES_LEADERSHIP
+
+    PUBLIC --> KS_STREAMLIT_VIEWER["KS_STREAMLIT_VIEWER<br/>broad app-entry role"]
 ```
 
-Each role below is granted *to* `KS_APP_ADMIN`, so the admin role inherits every
-privilege. `KS_APP_ADMIN` is in turn granted to `SYSADMIN`, keeping the standard
-admin hierarchy intact.
+`KS_STREAMLIT_VIEWER` is granted to `PUBLIC`, so every user can open apps. The
+business roles roll up to `KS_APP_ADMIN` (and transitively `SYSADMIN`) so an
+operator can test-view the app as any region.
 
-| Role | Purpose | Key privileges |
-|------|---------|----------------|
-| `KS_APP_ADMIN` | Governance role that inherits all roles below | (inherits everything) |
-| `KS_APP_DEVELOPER` | Creates and owns the **dev** app | OWNERSHIP on `KITCHEN_SINK_DEV.APPS`, `CREATE STREAMLIT`, `USAGE` on `KS_WH` + compute pool |
-| `KS_APP_DEPLOYER` | CI/CD service role | `CREATE STREAMLIT` + `USAGE` on **both** `APPS` schemas, warehouse, compute pool |
-| `KS_APP_OWNER_PROD` | Owns the **prod** app object | OWNERSHIP on `KITCHEN_SINK_PROD.APPS`, warehouse, compute pool |
-| `KS_VIEWER_EAST` | End-user viewer, EAST region | `USAGE` on dev db/schema + warehouse; app `USAGE` added later |
-| `KS_VIEWER_WEST` | End-user viewer, WEST region | same, WEST region |
-| `KS_VIEWER_ALL` | End-user viewer, account-wide | same, all regions |
+| Role | Layer | Purpose | Key privileges |
+|------|-------|---------|----------------|
+| `KS_STREAMLIT_VIEWER` | Access | Broad app entry, reused across every app | `USAGE ON STREAMLIT` (per app); granted to `PUBLIC` |
+| `KS_SALES_EAST` | Data | Business role — East sales | `SELECT` on sales data (Phase 2); rows filtered by policy |
+| `KS_SALES_WEST` | Data | Business role — West sales | same, West |
+| `KS_SALES_LEADERSHIP` | Data | Business role — sales leadership | same, all regions |
+| `KS_APP_ADMIN` | Build | Governance; inherits all functional roles | (inherits everything) |
+| `KS_APP_DEVELOPER` | Build | Creates/owns the **dev** app | OWNERSHIP on `KITCHEN_SINK_DEV.APPS`, `CREATE STREAMLIT`, `USAGE` on `KS_WH` + pool |
+| `KS_APP_DEPLOYER` | Build | CI/CD service role | `CREATE STREAMLIT` + `USAGE` on **both** `APPS` schemas, warehouse, pool |
+| `KS_APP_OWNER_PROD` | Build | Owns the **prod** app | OWNERSHIP on `KITCHEN_SINK_PROD.APPS`, warehouse, pool |
 
 ### Why this shape
 
+- **Share broadly, govern at the data layer.** A single `KS_STREAMLIT_VIEWER`
+  role (granted to `PUBLIC`) lets everyone open apps. You never create a viewer
+  role per app. What each user actually sees is decided by their business role
+  and a row access policy — not by who can open the app.
+- **Reuse existing business roles.** `KS_SALES_*` stand in for the functional
+  roles a real org already has. They carry the data `SELECT` grants and gate
+  *object* access; the row access policy governs *rows*.
+- **This is only safe under restricted caller's rights.** An **owner's-rights**
+  app queries as its *owner*, so sharing it to `KS_STREAMLIT_VIEWER` would show
+  every viewer the owner's full data — the business role and row policy are
+  bypassed. A **restricted caller's-rights** app queries as the *viewer*, so the
+  viewer's data grants and the row policy apply. That contrast is the point of
+  the next pattern.
 - **Separation of duties.** Roles are created by `USERADMIN`, granted by
-  `SECURITYADMIN`, and objects are owned by `SYSADMIN` — Snowflake's recommended
-  RBAC split. See `sql/00_foundation/01_roles.sql`.
-- **Ownership follows the environment.** The `APPS` schema in each database is owned
-  by the role responsible for that environment (`KS_APP_DEVELOPER` for dev,
-  `KS_APP_OWNER_PROD` for prod). Objects created there inherit the right owner.
-- **Sharing means granting a viewer role.** To share an app, grant
-  `USAGE ON STREAMLIT` to a viewer role, then grant that role to users. Viewers
-  never need direct access to the underlying tables when the app runs with
-  **owner's rights**.
-- **The viewer role is the governance control point.** Row access policies and
-  restricted caller's rights key off the viewer's role, so the same role hierarchy
-  that *shares* the app also *governs* what each viewer sees.
+  `SECURITYADMIN`, and objects are owned by `SYSADMIN`. See
+  `sql/00_foundation/01_roles.sql`.
+
+> **Caller's-rights detail:** restricted caller's rights run with the viewer's
+> *default* role (secondary roles require `USE SECONDARY ROLES`). Because the row
+> policy here keys on `CURRENT_USER()` via a mapping table (not on role), row
+> visibility is robust regardless of which role the viewer has active.
 
 ## Environments
 
@@ -73,15 +100,16 @@ USAGE grant needs `ACCOUNTADMIN`).
 ## Verify
 
 ```sql
-SHOW ROLES LIKE 'KS_%';
-SHOW GRANTS TO ROLE KS_APP_ADMIN;      -- should list all 6 child roles
-SHOW GRANTS TO ROLE KS_APP_DEPLOYER;   -- CREATE STREAMLIT on dev + prod APPS
+SHOW ROLES LIKE 'KS_%';                 -- 8 roles, no per-app viewer roles
+SHOW GRANTS OF ROLE KS_STREAMLIT_VIEWER; -- granted to PUBLIC
+SHOW GRANTS TO ROLE KS_APP_ADMIN;        -- inherits all 6 functional roles
 SELECT SCHEMA_NAME, SCHEMA_OWNER
   FROM KITCHEN_SINK_DEV.INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'APPS';
 ```
 
 ## Next
 
-The next pattern makes this tangible: a single Streamlit app that queries the same
-table through an **owner's-rights** connection and a **restricted caller's-rights**
-connection side by side, so you can watch the viewer's role change what's returned.
+The next pattern makes this tangible: a single Streamlit app, shared broadly via
+`KS_STREAMLIT_VIEWER`, that queries the same table through an **owner's-rights**
+connection and a **restricted caller's-rights** connection side by side — so you
+can watch the data layer, not the app grant, decide what each viewer sees.
