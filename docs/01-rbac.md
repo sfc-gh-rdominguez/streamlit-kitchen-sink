@@ -92,28 +92,6 @@ operator can test-view the app as any region.
 Shared query warehouse: `KS_WH` (XSMALL, auto-suspend 60s).
 Compute pool: `SYSTEM_COMPUTE_POOL_CPU` (account default; container runtime).
 
-## Run it
-
-```bash
-snow sql -c <connection> -f sql/00_foundation/01_roles.sql
-snow sql -c <connection> -f sql/00_foundation/02_databases.sql
-snow sql -c <connection> -f sql/00_foundation/03_warehouse_and_pool.sql
-```
-
-All scripts are idempotent. The connection's user must be able to escalate to
-`USERADMIN`, `SECURITYADMIN`, `SYSADMIN`, and `ACCOUNTADMIN` (the compute-pool
-USAGE grant needs `ACCOUNTADMIN`).
-
-## Verify
-
-```sql
-SHOW ROLES LIKE 'KS_%';                 -- 8 roles, no per-app viewer roles
-SHOW GRANTS OF ROLE KS_STREAMLIT_VIEWER; -- granted to PUBLIC
-SHOW GRANTS TO ROLE KS_APP_ADMIN;        -- inherits all 6 functional roles
-SELECT SCHEMA_NAME, SCHEMA_OWNER
-  FROM KITCHEN_SINK_DEV.INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'APPS';
-```
-
 ## Next
 
 The next pattern makes this tangible: a single Streamlit app, shared broadly via

@@ -4,11 +4,11 @@ One Streamlit app runs the **same query** through two connections, side by side:
 
 | Column | Connection | Runs as | Sees |
 |--------|-----------|---------|------|
-| Owner's rights | `st.connection("snowflake")` | the app **owner** role | every row |
-| Restricted caller's rights | `st.connection("snowflake-callers-rights")` | the **viewer** | only their entitled rows |
+| Owner's rights | `st.connection("snowflake")` | the app **owner** role | every row, unmasked |
+| Restricted caller's rights | `st.connection("snowflake-callers-rights")` | the **viewer** | only their entitled rows, masked |
 
-The contrast is produced entirely by a **row access policy** on
-`KITCHEN_SINK_DEV.APPS.SALES_BY_REGION` — the app code is identical on both sides.
+The app code is identical on both sides. The difference is produced entirely by
+governance policies on `KITCHEN_SINK_DEV.APPS.SALES_BY_REGION`.
 
 ## How it works
 
@@ -31,99 +31,76 @@ graph LR
   `CURRENT_USER()` is the viewer. The policy joins that to `USER_REGION_MAP` and
   returns only the entitled region (`ALL` sees everything).
 
-### Two layers of governance
+## How each connection resolves identity
 
-The demo stacks **row-level** and **column-level** controls so the two
+Neither the role nor the user is hardcoded in the app — each connection derives
+identity a different way:
+
+- **Owner's rights** runs as the **owner of the `STREAMLIT` object**
+  (`KS_APP_DEVELOPER`), fixed when the app is deployed. `CURRENT_ROLE()` is that
+  owner role for everyone who opens the app, regardless of who they are.
+- **Restricted caller's rights** runs as the **viewer**. Snowflake mints a
+  short-lived viewer token at session start, so `CURRENT_USER()` is whoever
+  opened the app and `CURRENT_ROLE()` is *their* default role. The app then runs
+  `USE SECONDARY ROLES ALL` to activate the viewer's other granted roles.
+
+Because the policies key on functional role *names* (`KS_*`) and `CURRENT_USER()`
+— never on a specific person — the same objects behave identically no matter who
+sets them up or opens the app.
+
+## Two layers of governance
+
+The demo stacks **row-level** and **column-level** controls, so the two
 connections differ in *which rows* and *which values* they see:
 
-- **Row access policy** on `region` — owner role sees all rows; a caller sees
+- **Row access policy** on `region` — the owner role sees all rows; a caller sees
   only their entitled region.
-- **Masking policy** on `rep` — the app owner role sees the real name; any other
-  role (i.e. a caller) sees `*** masked ***`. The unmask keys on `CURRENT_ROLE()`
-  (the primary role), so activating the viewer's roles as *secondary* roles does
-  not unmask.
+- **Masking policy** on `rep` — the owner role sees the real name; any other role
+  (i.e. a caller) sees `*** masked ***`. The unmask keys on `CURRENT_ROLE()` (the
+  *primary* role), so activating the viewer's roles as *secondary* roles does not
+  unmask them — which is why a caller who happens to hold the owner role by
+  inheritance is still masked.
 
-### Why caller's rights needs two things
+## Why caller's rights needs two things
 
-Restricted caller's rights is an **intersection**:
+Restricted caller's rights is an **intersection** of the viewer's privileges and
+the owner's caller grants:
 
-1. the viewer must actually hold `SELECT` on the table (business roles
+1. the viewer must actually hold `SELECT` on the table (the business roles
    `KS_SALES_*` carry it), **and**
 2. the app owner role must hold a matching **caller grant**
    (`GRANT CALLER SELECT ON TABLE … TO ROLE KS_APP_DEVELOPER`).
 
-The app also runs `USE SECONDARY ROLES ALL` on the caller's-rights connection so
-the viewer's business role (which holds `SELECT`) is active — caller's rights
-otherwise uses only the viewer's *default* role.
+Either alone is not enough — the caller grant only *permits* the app to use a
+privilege the viewer already has.
 
-### Requirements (all applied by the SQL in this repo)
+## What a viewer is entitled to
 
-- Container runtime (`SYSTEM$ST_CONTAINER_RUNTIME_PY3_11`) — caller's rights is
-  not available in the warehouse runtime.
-- `GRANT READ SESSION ON ACCOUNT TO ROLE KS_APP_DEVELOPER` — required for
-  `CURRENT_USER()` + row access policies inside SiS.
-- `MANAGE CALLER GRANTS` delegated to `KS_APP_ADMIN`, which grants the caller
-  privileges to the owner role.
-- A container-runtime app must declare dependencies in a `pyproject.toml`, and
-  those packages resolve from an attached artifact repository. This repo uses the
-  built-in Snowflake PyPI mirror (`snowflake.snowpark.pypi_shared_repository`) —
-  granted to the owner role in foundation SQL and attached at deploy time — so
-  `streamlit>=1.53.1` (needed for caller's rights) installs with no external
-  access integration or internet.
+Row visibility comes from `USER_REGION_MAP`, keyed on `CURRENT_USER()`. A viewer
+with no row in that table has no entitlement, so their caller's-rights view is
+empty. Entitlement is granted by adding the user to the map with a region (or
+`ALL`). That is the governance point of the whole pattern: **app access is broad,
+but data entitlement is precise and lives in the data layer.**
 
-## Build it
+## What the model requires
 
-```bash
-# 1. Data + policy + caller grants (run after Phase 1 foundation)
-snow sql -c <connection> -f sql/10_demo_data/01_sales_table.sql
-snow sql -c <connection> -f sql/10_demo_data/02_user_region_map.sql
-snow sql -c <connection> -f sql/10_demo_data/03_row_access_policy.sql
-snow sql -c <connection> -f sql/20_caller_grants/01_caller_grants.sql
+These are the conditions that make the two-connection contrast possible; the
+setup SQL in this repo applies them:
 
-# 2. Deploy the app as the dev owner role
-cd app
-snow streamlit deploy rights_demo -c <connection> --replace
-# then grant the broad entry role USAGE on the app:
-snow sql -c <connection> -q "GRANT USAGE ON STREAMLIT KITCHEN_SINK_DEV.APPS.KITCHEN_SINK_RIGHTS_DEMO TO ROLE KS_STREAMLIT_VIEWER;"
-```
+- **Container runtime** (`SYSTEM$ST_CONTAINER_RUNTIME_PY3_11`) — restricted
+  caller's rights is not available in the warehouse runtime.
+- **`READ SESSION` on the owner role** — so `CURRENT_USER()` and row access
+  policies resolve inside a Streamlit in Snowflake app.
+- **Caller grants**, delegated through `MANAGE CALLER GRANTS` to `KS_APP_ADMIN` —
+  the owner-side half of the intersection above.
+- **A declared `pyproject.toml`** resolved from the built-in Snowflake PyPI
+  mirror (`snowflake.snowpark.pypi_shared_repository`). A container app overrides
+  the runtime's default packages, so it must declare its own — including
+  `streamlit>=1.53.1`, the minimum for caller's rights — and the mirror installs
+  them with no external access integration or internet.
 
-> The app must be **owned by `KS_APP_DEVELOPER`** so its owner's-rights column
-> matches the policy's owner branch. Deploy while that role is active.
+---
 
-## Verify
-
-### Data layer (SQL — already confirmed)
-
-```sql
--- Owner role: full view (6 rows, EAST + WEST)
-USE ROLE KS_APP_DEVELOPER;
-SELECT COUNT(*), LISTAGG(DISTINCT region, ',') FROM KITCHEN_SINK_DEV.APPS.SALES_BY_REGION;
-
--- Non-owner (mapped user): filtered to their region
-USE ROLE KS_SALES_EAST;
-SELECT COUNT(*), LISTAGG(DISTINCT region, ',') FROM KITCHEN_SINK_DEV.APPS.SALES_BY_REGION;
-```
-
-### In the app (browser)
-
-Open the app and compare the two columns:
-
-`https://app.snowflake.com/<org>/<account>/#/streamlit-apps/KITCHEN_SINK_DEV.APPS.KITCHEN_SINK_RIGHTS_DEMO`
-
-- [ ] **Owner's rights** column shows **all 6 rows** (EAST + WEST).
-- [ ] **Restricted caller's rights** column shows only the region mapped to your
-      user in `USER_REGION_MAP` (seeded to **EAST** for the current operator).
-- [ ] The `rep` column is `*** masked ***` on the caller's-rights side and shows
-      real names on the owner's-rights side.
-- [ ] `CURRENT_USER()` matches on both sides; `CURRENT_ROLE()` differs (owner
-      role on the left, your role on the right).
-- [ ] Re-map your user to `WEST` (or `ALL`) and refresh — the caller's-rights
-      column changes while the owner's-rights column stays full.
-
-```sql
--- Flip the entitlement to demo the change:
-UPDATE KITCHEN_SINK_DEV.APPS.USER_REGION_MAP SET region = 'WEST' WHERE username = CURRENT_USER();
-```
-
-For a multi-user demo, create additional users mapped to different regions and
-open the app as each.
+The objects behind this pattern are created by the SQL under `sql/10_demo_data/`
+and `sql/20_caller_grants/`, and applied together by the `just data` and
+`just deploy` recipes.
