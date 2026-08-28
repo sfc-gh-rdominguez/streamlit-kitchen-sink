@@ -9,3 +9,5 @@ A teaching repo for three Streamlit-in-Snowflake patterns:
 Snowflake objects are created by idempotent SQL under `sql/`. See `docs/` for details.
 
 > WIP — fuller README coming.
+
+# preview smoke test
