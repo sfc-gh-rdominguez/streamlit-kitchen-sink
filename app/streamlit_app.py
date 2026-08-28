@@ -33,7 +33,7 @@ ENV_DB = owner_conn.query("SELECT CURRENT_DATABASE() AS DB", ttl=0)["DB"][0]
 TABLE = f"{ENV_DB}.DATA.SALES_BY_REGION"
 DATA_SQL = f"SELECT region, rep, deal, amount, closed_on FROM {TABLE} ORDER BY region, closed_on"
 
-st.caption(f"Environment: **{ENV_DB}** · table `{TABLE}`")
+st.caption(f"Environment: **{ENV_DB}**")
 
 # Caller's-rights setup, run on the same cursor as each query so the warehouse
 # and secondary roles are active in that session.
@@ -64,7 +64,7 @@ def show_caller(conn):
     rows = run_caller_df(conn, DATA_SQL)
     st.metric("Rows visible", len(rows))
     if rows.empty:
-        st.info("No region entitlement for your user in USER_REGION_MAP — nothing to show.")
+        st.info("You don't have access to any region's data.")
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
