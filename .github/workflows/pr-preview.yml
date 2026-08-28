@@ -19,13 +19,14 @@ concurrency:
 
 env:
   PR_DB: KITCHEN_SINK_PR_${{ github.event.number }}
-  SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-  SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-  KEY: ${{ runner.temp }}/key.p8
 
 jobs:
   preview:
     runs-on: ubuntu-latest
+    env:
+      SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+      KEY: ${{ github.workspace }}/key.p8
     steps:
       - uses: actions/checkout@v4
 

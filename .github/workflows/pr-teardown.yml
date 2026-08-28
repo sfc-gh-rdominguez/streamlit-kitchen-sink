@@ -9,13 +9,14 @@ on:
 
 env:
   PR_DB: KITCHEN_SINK_PR_${{ github.event.number }}
-  SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-  SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-  KEY: ${{ runner.temp }}/key.p8
 
 jobs:
   teardown:
     runs-on: ubuntu-latest
+    env:
+      SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+      KEY: ${{ github.workspace }}/key.p8
     steps:
       - uses: actions/setup-python@v5
         with:

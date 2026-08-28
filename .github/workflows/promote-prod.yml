@@ -12,16 +12,15 @@ on:
         required: true
         default: ""
 
-env:
-  SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-  SF_USER: ${{ secrets.SNOWFLAKE_USER }}
-  KEY: ${{ runner.temp }}/key.p8
-
 jobs:
   promote:
     runs-on: ubuntu-latest
     environment: production   # configure required reviewers on this Environment
     if: ${{ github.event.inputs.confirm == 'promote' }}
+    env:
+      SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+      KEY: ${{ github.workspace }}/key.p8
     steps:
       - uses: actions/checkout@v4
 
