@@ -79,6 +79,13 @@ GRANT ROLE KS_SALES_LEADERSHIP TO ROLE KS_APP_ADMIN;
 
 GRANT ROLE KS_APP_ADMIN TO ROLE SYSADMIN;
 
+-- The CI deployer assumes each environment's owner role to deploy/own apps as
+-- that role (so app ownership stays aligned with the policy owner-exemption) and
+-- to read prod when cloning. This is the CI identity's scoped power — it never
+-- needs SYSADMIN or ACCOUNTADMIN.
+GRANT ROLE KS_APP_STAGING    TO ROLE KS_APP_DEPLOYER;
+GRANT ROLE KS_APP_OWNER_PROD TO ROLE KS_APP_DEPLOYER;
+
 -- App entry is broad: everyone may open Streamlit apps.
 GRANT ROLE KS_STREAMLIT_VIEWER TO ROLE PUBLIC;
 
