@@ -1,25 +1,23 @@
 /*
  * ============================================================================
- * Phase 2 · 10_demo_data/01_sales_table.sql  —  Demo data + object grants
+ * Phase 2 · 10_demo_data/01_sales_table.sql  —  Demo data (env-parametrized)
  * ============================================================================
  *
- * A tiny sales-by-region table drives the owner's-vs-caller's-rights demo.
- * Owned by KS_APP_DEVELOPER (the dev app owner). Business roles get SELECT so
- * that, under restricted caller's rights, a viewer who holds one of those roles
- * actually possesses the SELECT privilege the app runs with on their behalf.
+ * Lives in <db>.DATA. Run against an environment with:
+ *   snow sql -D db=KITCHEN_SINK_PROD -D owner_role=KS_APP_OWNER_PROD -f ...
  *
- * (Restricted caller's rights are an INTERSECTION: the viewer must hold the
- * privilege AND the owner must hold a matching caller grant — see
- * sql/20_caller_grants/01_caller_grants.sql.)
+ * PROD.DATA is the source of truth. DEV.DATA is a zero-copy clone of it, so in
+ * normal use this DDL only runs against prod; dev is refreshed by cloning.
  *
  * Idempotent.
  * ============================================================================
  */
 
-USE ROLE KS_APP_DEVELOPER;
+USE ROLE <% owner_role %>;
 USE WAREHOUSE KS_WH;
+USE SCHEMA <% db %>.DATA;
 
-CREATE TABLE IF NOT EXISTS KITCHEN_SINK_DEV.APPS.SALES_BY_REGION (
+CREATE TABLE IF NOT EXISTS SALES_BY_REGION (
   region     VARCHAR,
   rep        VARCHAR,
   deal       VARCHAR,
@@ -27,10 +25,8 @@ CREATE TABLE IF NOT EXISTS KITCHEN_SINK_DEV.APPS.SALES_BY_REGION (
   closed_on  DATE
 );
 
--- Reset + seed so re-runs are deterministic.
-TRUNCATE TABLE KITCHEN_SINK_DEV.APPS.SALES_BY_REGION;
-INSERT INTO KITCHEN_SINK_DEV.APPS.SALES_BY_REGION
-  (region, rep, deal, amount, closed_on) VALUES
+TRUNCATE TABLE SALES_BY_REGION;
+INSERT INTO SALES_BY_REGION (region, rep, deal, amount, closed_on) VALUES
   ('EAST', 'Ada',   'Acme Corp',      120000.00, '2026-01-14'),
   ('EAST', 'Ada',   'Globex',          84000.00, '2026-02-03'),
   ('EAST', 'Ben',   'Initech',         56000.00, '2026-02-19'),
@@ -39,6 +35,7 @@ INSERT INTO KITCHEN_SINK_DEV.APPS.SALES_BY_REGION
   ('WEST', 'Drew',  'Hooli',          145000.00, '2026-03-02');
 
 -- Object access for the business roles (row filtering is handled by the policy).
-GRANT SELECT ON TABLE KITCHEN_SINK_DEV.APPS.SALES_BY_REGION TO ROLE KS_SALES_EAST;
-GRANT SELECT ON TABLE KITCHEN_SINK_DEV.APPS.SALES_BY_REGION TO ROLE KS_SALES_WEST;
-GRANT SELECT ON TABLE KITCHEN_SINK_DEV.APPS.SALES_BY_REGION TO ROLE KS_SALES_LEADERSHIP;
+-- These SELECT grants survive a zero-copy clone (child-object grants are copied).
+GRANT SELECT ON TABLE <% db %>.DATA.SALES_BY_REGION TO ROLE KS_SALES_EAST;
+GRANT SELECT ON TABLE <% db %>.DATA.SALES_BY_REGION TO ROLE KS_SALES_WEST;
+GRANT SELECT ON TABLE <% db %>.DATA.SALES_BY_REGION TO ROLE KS_SALES_LEADERSHIP;
