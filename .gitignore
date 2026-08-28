@@ -1,0 +1,21 @@
+# Snowflake / Cortex local state
+.snowflake/
+.cortex/
+
+# Streamlit local secrets (never commit)
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+*.egg-info/
+
+# Keys (CI/CD service auth — never commit)
+*.p8
+*.pem
+rsa_key*
+
+# OS
+.DS_Store
