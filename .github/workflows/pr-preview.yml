@@ -64,12 +64,11 @@ jobs:
 
       - name: Get preview URL
         id: url
-        working-directory: app
         run: |
-          URL=$(snow streamlit get-url rights_demo \
+          URL=$(snow streamlit get-url "$PR_DB.APPS.KITCHEN_SINK_RIGHTS_DEMO" \
             --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
             --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" \
-            --role KS_APP_STAGING --env target_db=$PR_DB)
+            --role KS_APP_STAGING | tail -1)
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Comment preview URL
