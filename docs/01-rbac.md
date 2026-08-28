@@ -1,14 +1,26 @@
 # Role hierarchy, environments & governance
 
-This is the foundation the other patterns build on. It answers a common question:
-**what's the best way to share and govern Streamlit in Snowflake apps?** The answer
-separates three concerns that are easy to conflate:
+## The mistake everyone makes first
 
-- **App creation** — who may *build and deploy* an app. Scoped here to a small
-  set of dedicated build roles.
-- **App access** — who may *open* an app. Keep this broad and reuse it across apps.
-- **Data access** — what a user *sees inside*. Govern this with your existing
-  business roles and row-level security, not with per-app roles.
+The very first instinct, when you share a Streamlit app in Snowflake, is to create
+a role for it. `SALES_APP_VIEWER`, say. You grant it to the people who should see
+the app, and you feel organized. Then you build a second app, and a third, and by
+the fifth you've got a snarl of near-identical viewer roles, nobody remembers which
+one gates what, and someone in leadership still can't see the dashboard they asked
+for last Tuesday.
+
+The fix is to stop conflating three completely different questions that only *look*
+like the same question:
+
+- **App creation** — who may *build and deploy* an app. This should be a short list
+  of dedicated build roles, and nobody else.
+- **App access** — who may *open* an app. This should be broad, boring, and reused
+  across every app you ever ship.
+- **Data access** — what a user actually *sees inside*. This is governed by the
+  business roles and row-level security you (hopefully) already have — not by
+  whoever happened to click the app.
+
+Keep those three apart and the snarl never forms. Here's what that looks like.
 
 ## Three layers, one hierarchy
 
@@ -38,14 +50,15 @@ graph TD
     PUBLIC --> KS_STREAMLIT_VIEWER["KS_STREAMLIT_VIEWER<br/>broad app-entry role"]
 ```
 
-`KS_STREAMLIT_VIEWER` is granted to `PUBLIC`, so every user can open apps. The
-business roles roll up to `KS_APP_ADMIN` (and transitively `SYSADMIN`) so an
-operator can test-view the app as any region.
+`KS_STREAMLIT_VIEWER` hangs off `PUBLIC`, so *everyone* can open the apps — that's
+the point, not a bug. And every business role rolls up to `KS_APP_ADMIN` (and
+transitively `SYSADMIN`), so an operator can impersonate any region to test what a
+real viewer would see, without keeping a spreadsheet of test accounts.
 
 | Role | Layer | Purpose | Key privileges |
 |------|-------|---------|----------------|
 | `KS_STREAMLIT_VIEWER` | Access | Broad app entry, reused across every app | `USAGE ON STREAMLIT` (per app); granted to `PUBLIC` |
-| `KS_SALES_EAST` | Data | Business role — East sales | `SELECT` on sales data (Phase 2); rows filtered by policy |
+| `KS_SALES_EAST` | Data | Business role — East sales | `SELECT` on sales data; rows filtered by policy |
 | `KS_SALES_WEST` | Data | Business role — West sales | same, West |
 | `KS_SALES_LEADERSHIP` | Data | Business role — sales leadership | same, all regions |
 | `KS_APP_ADMIN` | Build | Governance; inherits all functional roles | (inherits everything) |
@@ -53,34 +66,43 @@ operator can test-view the app as any region.
 | `KS_APP_DEPLOYER` | Build | CI/CD service role | `CREATE STREAMLIT` + `USAGE` on **both** `APPS` schemas, warehouse, pool |
 | `KS_APP_OWNER_PROD` | Build | Owns the **prod** app | OWNERSHIP on `KITCHEN_SINK_PROD.APPS`, warehouse, pool |
 
-### Why this shape
+## Why it's shaped this way
 
-- **Lock down who can build.** `CREATE STREAMLIT` is a schema-level privilege
-  held only by the dedicated build roles — `KS_APP_STAGING` (and the schema
-  ownership it has in dev), `KS_APP_DEPLOYER`, and `KS_APP_OWNER_PROD` in prod.
-  It is *not* granted to `KS_STREAMLIT_VIEWER`, business roles, or `PUBLIC`, so a
-  user who can open every app still cannot create or modify one.
-- **Share broadly, govern at the data layer.** A single `KS_STREAMLIT_VIEWER`
-  role (granted to `PUBLIC`) lets everyone open apps. You never create a viewer
-  role per app. What each user actually sees is decided by their business role
-  and a row access policy — not by who can open the app.
-- **Reuse existing business roles.** `KS_SALES_*` stand in for the functional
-  roles a real org already has. They carry the data `SELECT` grants and gate
-  *object* access; the row access policy governs *rows*.
-- **This is only safe under restricted caller's rights.** An **owner's-rights**
-  app queries as its *owner*, so sharing it to `KS_STREAMLIT_VIEWER` would show
-  every viewer the owner's full data — the business role and row policy are
-  bypassed. A **restricted caller's-rights** app queries as the *viewer*, so the
-  viewer's data grants and the row policy apply. That contrast is the point of
-  the next pattern.
-- **Separation of duties.** Roles are created by `USERADMIN`, granted by
-  `SECURITYADMIN`, and objects are owned by `SYSADMIN`. See
-  `sql/00_foundation/01_roles.sql`.
+**Locking down who can build.** `CREATE STREAMLIT` is a schema-level privilege, and
+here it lives *only* on the dedicated build roles — `KS_APP_STAGING` (which also owns
+the staging `APPS` schema), `KS_APP_DEPLOYER`, and `KS_APP_OWNER_PROD`. It is
+deliberately *not* granted to `KS_STREAMLIT_VIEWER`, the business roles, or `PUBLIC`.
+So a user who can open every app in the account still can't create or clobber one —
+opening an app and building an app are different verbs.
 
-> **Caller's-rights detail:** restricted caller's rights run with the viewer's
-> *default* role (secondary roles require `USE SECONDARY ROLES`). Because the row
-> policy here keys on `CURRENT_USER()` via a mapping table (not on role), row
-> visibility is robust regardless of which role the viewer has active.
+**Sharing broadly, governing at the data layer.** One `KS_STREAMLIT_VIEWER` role,
+granted to `PUBLIC`, lets everyone in. You never mint a viewer role per app again.
+What each person actually *sees* is decided somewhere else entirely — by their
+business role and a row access policy.
+
+**Reusing the business roles you already have.** `KS_SALES_EAST`, `KS_SALES_WEST`,
+and `KS_SALES_LEADERSHIP` are stand-ins for the functional roles a real org already
+runs on. They carry the `SELECT` grants and gate *object* access; the row access
+policy handles *rows*. Nothing here is app-specific — your governance doesn't get a
+parallel universe just because the front end is Streamlit.
+
+**This is only safe under restricted caller's rights.** An **owner's-rights** app
+queries as its *owner*, so sharing it to `KS_STREAMLIT_VIEWER` would hand every
+single viewer the owner's full, unfiltered data — the business roles and row policy
+get quietly bypassed. A **restricted caller's-rights** app queries as the *viewer*,
+so their data grants and the row policy actually apply. Sharing broadly only works
+because of that second model, which is what the [next chapter](02-rights-model.md)
+is about.
+
+**Separation of duties, because future-you will thank you.** Roles are created by
+`USERADMIN`, granted by `SECURITYADMIN`, and objects are owned by `SYSADMIN`. It's
+all in `sql/00_foundation/01_roles.sql` if you want to see who does what.
+
+> **One subtlety about caller's rights:** it runs with the viewer's *default* role
+> (secondary roles need an explicit `USE SECONDARY ROLES`). The row policy here keys
+> on `CURRENT_USER()` through an entitlement table rather than on role, so row visibility
+> holds up no matter which role the viewer happens to have active. More on why that
+> matters next chapter.
 
 ## Environments
 
@@ -89,12 +111,15 @@ operator can test-view the app as any region.
 | `KITCHEN_SINK_STAGING` | `APPS` | `KS_APP_STAGING` | development |
 | `KITCHEN_SINK_PROD` | `APPS` | `KS_APP_OWNER_PROD` | production |
 
-Shared query warehouse: `KS_WH` (XSMALL, auto-suspend 60s).
-Compute pool: `SYSTEM_COMPUTE_POOL_CPU` (account default; container runtime).
+Shared query warehouse: `KS_WH` (XSMALL, auto-suspend 60s — this is a demo, not a
+data center). Compute pool: `SYSTEM_COMPUTE_POOL_CPU`, the account default, because
+the app runs on the container runtime.
 
 ## Next
 
-The next pattern makes this tangible: a single Streamlit app, shared broadly via
-`KS_STREAMLIT_VIEWER`, that queries the same table through an **owner's-rights**
-connection and a **restricted caller's-rights** connection side by side — so you
-can watch the data layer, not the app grant, decide what each viewer sees.
+So far this is all scaffolding — roles pointing at other roles, which is only
+convincing up to a point. The [next chapter](02-rights-model.md) makes it real: one
+Streamlit app, shared to everyone via `KS_STREAMLIT_VIEWER`, running the *same query*
+through an owner's-rights connection and a restricted caller's-rights connection side
+by side. You'll watch the data layer — not the app grant — decide what each viewer
+sees.
