@@ -4,8 +4,8 @@ This is the foundation the other patterns build on. It answers a common question
 **what's the best way to share and govern Streamlit in Snowflake apps?** The answer
 separates three concerns that are easy to conflate:
 
-- **App creation** — who may *build and deploy* an app. Restrict this to a small
-  set of dedicated build roles; it should never be broad.
+- **App creation** — who may *build and deploy* an app. Scoped here to a small
+  set of dedicated build roles.
 - **App access** — who may *open* an app. Keep this broad and reuse it across apps.
 - **Data access** — what a user *sees inside*. Govern this with your existing
   business roles and row-level security, not with per-app roles.
@@ -59,8 +59,7 @@ operator can test-view the app as any region.
   held only by the dedicated build roles — `KS_APP_DEVELOPER` (and the schema
   ownership it has in dev), `KS_APP_DEPLOYER`, and `KS_APP_OWNER_PROD` in prod.
   It is *not* granted to `KS_STREAMLIT_VIEWER`, business roles, or `PUBLIC`, so a
-  user who can open every app still cannot create or modify one. Restricting app
-  creation is increasingly a requirement, not a nicety.
+  user who can open every app still cannot create or modify one.
 - **Share broadly, govern at the data layer.** A single `KS_STREAMLIT_VIEWER`
   role (granted to `PUBLIC`) lets everyone open apps. You never create a viewer
   role per app. What each user actually sees is decided by their business role
