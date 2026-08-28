@@ -1,31 +1,34 @@
-# Phase 1 — Role hierarchy, environments & governance
+# Role hierarchy, environments & governance
 
-This phase builds the RBAC foundation that Phases 2 and 3 stand on. It is also the
-direct answer to the question customers ask most: **"what's the best way to share
-and govern these apps?"** The answer is *dedicated, functional roles* plus a clean
-environment split — never app privileges pinned to a person's default role.
+This is the foundation the other patterns build on. It answers a common question:
+**what's the best way to share and govern Streamlit in Snowflake apps?** The answer
+is *dedicated, functional roles* plus a clean split between development and
+production — never app privileges pinned to a person's default role.
 
 ## The role model
 
+```mermaid
+graph TD
+    SYSADMIN --> KS_APP_ADMIN
+    KS_APP_ADMIN --> KS_APP_DEVELOPER["KS_APP_DEVELOPER<br/>creates/owns the DEV app"]
+    KS_APP_ADMIN --> KS_APP_DEPLOYER["KS_APP_DEPLOYER<br/>CI/CD service role"]
+    KS_APP_ADMIN --> KS_APP_OWNER_PROD["KS_APP_OWNER_PROD<br/>owns the PROD app"]
+    KS_APP_ADMIN --> KS_VIEWER_EAST["KS_VIEWER_EAST<br/>end-user viewer (EAST)"]
+    KS_APP_ADMIN --> KS_VIEWER_WEST["KS_VIEWER_WEST<br/>end-user viewer (WEST)"]
+    KS_APP_ADMIN --> KS_VIEWER_ALL["KS_VIEWER_ALL<br/>end-user viewer (all regions)"]
 ```
-                         SYSADMIN
-                            │  (KS_APP_ADMIN granted up to SYSADMIN)
-                            ▼
-                      KS_APP_ADMIN            top governance role
-        ┌───────────────┬────┴────┬───────────────┬──────────────┐
-        ▼               ▼         ▼               ▼              ▼
- KS_APP_DEVELOPER  KS_APP_DEPLOYER  KS_APP_OWNER_PROD   KS_VIEWER_EAST / WEST / ALL
-  (creates/owns      (CI/CD          (owns the           (end users; drive the
-   the DEV app)       service role)   PROD app)           row access policy demo)
-```
+
+Each role below is granted *to* `KS_APP_ADMIN`, so the admin role inherits every
+privilege. `KS_APP_ADMIN` is in turn granted to `SYSADMIN`, keeping the standard
+admin hierarchy intact.
 
 | Role | Purpose | Key privileges |
 |------|---------|----------------|
-| `KS_APP_ADMIN` | Governance; inherits all roles below so one operator can create, deploy, own, and test-view | (inherits everything) |
-| `KS_APP_DEVELOPER` | Creates and owns the **dev** Streamlit app | OWNERSHIP on `KITCHEN_SINK_DEV.APPS`, `CREATE STREAMLIT`, `USAGE` on `KS_WH` + compute pool |
-| `KS_APP_DEPLOYER` | CI/CD service role (Phase 3) | `CREATE STREAMLIT` + `USAGE` on **both** `APPS` schemas, warehouse, compute pool |
+| `KS_APP_ADMIN` | Governance role that inherits all roles below | (inherits everything) |
+| `KS_APP_DEVELOPER` | Creates and owns the **dev** app | OWNERSHIP on `KITCHEN_SINK_DEV.APPS`, `CREATE STREAMLIT`, `USAGE` on `KS_WH` + compute pool |
+| `KS_APP_DEPLOYER` | CI/CD service role | `CREATE STREAMLIT` + `USAGE` on **both** `APPS` schemas, warehouse, compute pool |
 | `KS_APP_OWNER_PROD` | Owns the **prod** app object | OWNERSHIP on `KITCHEN_SINK_PROD.APPS`, warehouse, compute pool |
-| `KS_VIEWER_EAST` | End-user viewer, EAST region | `USAGE` on dev db/schema + warehouse; app `USAGE` added in Phase 2 |
+| `KS_VIEWER_EAST` | End-user viewer, EAST region | `USAGE` on dev db/schema + warehouse; app `USAGE` added later |
 | `KS_VIEWER_WEST` | End-user viewer, WEST region | same, WEST region |
 | `KS_VIEWER_ALL` | End-user viewer, account-wide | same, all regions |
 
@@ -37,12 +40,13 @@ environment split — never app privileges pinned to a person's default role.
 - **Ownership follows the environment.** The `APPS` schema in each database is owned
   by the role responsible for that environment (`KS_APP_DEVELOPER` for dev,
   `KS_APP_OWNER_PROD` for prod). Objects created there inherit the right owner.
-- **Sharing = granting a viewer role.** To share an app you grant `USAGE ON STREAMLIT`
-  to a viewer role, then grant that role to users. Viewers never need direct access
-  to the underlying tables when the app runs with **owner's rights** (Phase 2).
-- **Governance = the viewer role is the control point.** Row access policies and
-  restricted caller's rights (Phase 2) key off the viewer's role, so the same role
-  hierarchy that *shares* the app also *governs* what each viewer sees.
+- **Sharing means granting a viewer role.** To share an app, grant
+  `USAGE ON STREAMLIT` to a viewer role, then grant that role to users. Viewers
+  never need direct access to the underlying tables when the app runs with
+  **owner's rights**.
+- **The viewer role is the governance control point.** Row access policies and
+  restricted caller's rights key off the viewer's role, so the same role hierarchy
+  that *shares* the app also *governs* what each viewer sees.
 
 ## Environments
 
@@ -78,6 +82,6 @@ SELECT SCHEMA_NAME, SCHEMA_OWNER
 
 ## Next
 
-Phase 2 makes this tangible: a single Streamlit app that queries the same table
-through an **owner's-rights** connection and a **restricted caller's-rights**
-connection side by side, so you can watch the viewer role change what's returned.
+The next pattern makes this tangible: a single Streamlit app that queries the same
+table through an **owner's-rights** connection and a **restricted caller's-rights**
+connection side by side, so you can watch the viewer's role change what's returned.
