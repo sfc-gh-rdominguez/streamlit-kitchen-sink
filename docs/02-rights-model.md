@@ -31,6 +31,18 @@ graph LR
   `CURRENT_USER()` is the viewer. The policy joins that to `USER_REGION_MAP` and
   returns only the entitled region (`ALL` sees everything).
 
+### Two layers of governance
+
+The demo stacks **row-level** and **column-level** controls so the two
+connections differ in *which rows* and *which values* they see:
+
+- **Row access policy** on `region` — owner role sees all rows; a caller sees
+  only their entitled region.
+- **Masking policy** on `rep` — the app owner role sees the real name; any other
+  role (i.e. a caller) sees `*** masked ***`. The unmask keys on `CURRENT_ROLE()`
+  (the primary role), so activating the viewer's roles as *secondary* roles does
+  not unmask.
+
 ### Why caller's rights needs two things
 
 Restricted caller's rights is an **intersection**:
@@ -101,6 +113,8 @@ Open the app and compare the two columns:
 - [ ] **Owner's rights** column shows **all 6 rows** (EAST + WEST).
 - [ ] **Restricted caller's rights** column shows only the region mapped to your
       user in `USER_REGION_MAP` (seeded to **EAST** for the current operator).
+- [ ] The `rep` column is `*** masked ***` on the caller's-rights side and shows
+      real names on the owner's-rights side.
 - [ ] `CURRENT_USER()` matches on both sides; `CURRENT_ROLE()` differs (owner
       role on the left, your role on the right).
 - [ ] Re-map your user to `WEST` (or `ALL`) and refresh — the caller's-rights

@@ -22,6 +22,7 @@ data connection:
   snow sql -c {{connection}} -f sql/10_demo_data/01_sales_table.sql
   snow sql -c {{connection}} -f sql/10_demo_data/02_user_region_map.sql
   snow sql -c {{connection}} -f sql/10_demo_data/03_row_access_policy.sql
+  snow sql -c {{connection}} -f sql/10_demo_data/04_masking_policy.sql
   snow sql -c {{connection}} -f sql/20_caller_grants/01_caller_grants.sql
 
 # Deploy the Streamlit app as the dev owner role so its owner's-rights view
