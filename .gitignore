@@ -12,6 +12,9 @@ __pycache__/
 .uv/
 *.egg-info/
 
+# Snowflake CLI deploy bundle
+output/
+
 # Keys (CI/CD service auth — never commit)
 *.p8
 *.pem

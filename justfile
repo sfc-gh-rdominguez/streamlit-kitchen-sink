@@ -15,6 +15,22 @@ setup connection:
 verify connection:
   snow sql -c {{connection}} -q "SHOW ROLES LIKE 'KS_%'; SHOW GRANTS OF ROLE KS_STREAMLIT_VIEWER; SHOW GRANTS TO ROLE KS_APP_ADMIN;"
 
+# Owner's-vs-caller's-rights demo: build the data layer (sales table, user->region
+# map, row access policy) and the caller grants. Run after `setup`.
+
+data connection:
+  snow sql -c {{connection}} -f sql/10_demo_data/01_sales_table.sql
+  snow sql -c {{connection}} -f sql/10_demo_data/02_user_region_map.sql
+  snow sql -c {{connection}} -f sql/10_demo_data/03_row_access_policy.sql
+  snow sql -c {{connection}} -f sql/20_caller_grants/01_caller_grants.sql
+
+# Deploy the Streamlit app as the dev owner role so its owner's-rights view
+# matches the row access policy, then share it via the broad entry role.
+
+deploy connection:
+  cd app && snow streamlit deploy rights_demo -c {{connection}} --role KS_APP_DEVELOPER --replace
+  snow sql -c {{connection}} -q "USE ROLE KS_APP_DEVELOPER; GRANT USAGE ON STREAMLIT KITCHEN_SINK_DEV.APPS.KITCHEN_SINK_RIGHTS_DEMO TO ROLE KS_STREAMLIT_VIEWER;"
+
 # WARNING: drops the KITCHEN_SINK databases, the KS_WH warehouse, and every KS_*
 # role. There is no undo.
 
