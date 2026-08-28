@@ -1,0 +1,43 @@
+name: Refresh CI network policy
+
+# GitHub rotates its Actions runner IP ranges (~weekly). This refreshes the
+# KS_DEPLOYER_GH_ACTIONS network policy so the CI service user keeps its access
+# to the VPN-restricted account. Runs under the scoped KS_NETPOLICY_ADMIN role.
+#
+# Note: this runs from a GitHub-hosted runner (an allowlisted IP), so it is
+# mostly self-healing. If GitHub drift ever locks the runner out before a
+# refresh, re-run scripts/refresh_gh_actions_network_policy.py from an allowed
+# IP. A self-hosted runner avoids this entirely.
+
+on:
+  schedule:
+    - cron: "17 8 * * 1"   # Mondays 08:17 UTC
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+      KEY: ${{ github.workspace }}/key.p8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Snowflake CLI
+        run: pip install --upgrade snowflake-cli
+
+      - name: Write deployer key
+        run: |
+          printf '%s' "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > "$KEY"
+          chmod 600 "$KEY"
+
+      - name: Refresh network policy
+        run: |
+          python3 scripts/refresh_gh_actions_network_policy.py > np.sql
+          snow sql --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
+            --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" -f np.sql

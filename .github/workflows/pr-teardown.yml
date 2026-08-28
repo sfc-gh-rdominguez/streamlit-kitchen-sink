@@ -7,6 +7,10 @@ on:
   pull_request:
     types: [closed]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 env:
   PR_DB: KITCHEN_SINK_PR_${{ github.event.number }}
 
@@ -35,3 +39,14 @@ jobs:
           snow sql --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
             --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" \
             -q "USE ROLE KS_APP_DEPLOYER; DROP DATABASE IF EXISTS $PR_DB;"
+
+      - name: Comment teardown confirmation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `### 🧹 Preview environment cleaned up\n\nThe preview database \`${process.env.PR_DB}\` has been dropped.`,
+            });

@@ -54,9 +54,11 @@ scoped role.
     Preferred for strict environments.
   - *User-scoped network policy* on `KS_DEPLOYER` allowlisting GitHub Actions IP
     ranges (a user-level policy overrides the account policy for that user only).
-    See `scripts/refresh_gh_actions_network_policy.py`. Note: this allows all
-    GitHub runner IPs (broad) and GitHub rotates the ranges weekly, so the script
-    must be re-run on a schedule.
+    `scripts/refresh_gh_actions_network_policy.py` builds it, and the
+    `network-policy-refresh` workflow re-runs weekly (GitHub rotates the ranges)
+    under a narrowly-scoped `KS_NETPOLICY_ADMIN` role that owns only that policy
+    and its rules. Caveat: this allows all GitHub runner IPs (broad) — prefer a
+    self-hosted runner where narrow IPs matter.
 
 ## Why previews clone prod (not staging)
 
