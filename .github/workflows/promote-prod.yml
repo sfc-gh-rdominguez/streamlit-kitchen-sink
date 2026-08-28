@@ -1,0 +1,49 @@
+name: Promote to prod
+
+# Manual, approval-gated promotion of the app to production. The `production`
+# GitHub Environment should be configured with required reviewers so this job
+# pauses for approval before deploying. Deploys as the prod owner role.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "promote" to confirm prod deploy'
+        required: true
+        default: ""
+
+env:
+  SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+  KEY: ${{ runner.temp }}/key.p8
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production   # configure required reviewers on this Environment
+    if: ${{ github.event.inputs.confirm == 'promote' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Snowflake CLI
+        run: pip install --upgrade snowflake-cli
+
+      - name: Write deployer key
+        run: |
+          printf '%s' "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > "$KEY"
+          chmod 600 "$KEY"
+
+      - name: Deploy app to prod
+        working-directory: app
+        run: |
+          snow streamlit deploy rights_demo --replace \
+            --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
+            --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" \
+            --role KS_APP_OWNER_PROD --env target_db=KITCHEN_SINK_PROD
+          snow sql --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
+            --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" \
+            -q "USE ROLE KS_APP_OWNER_PROD; ALTER STREAMLIT KITCHEN_SINK_PROD.APPS.KITCHEN_SINK_RIGHTS_DEMO SET ARTIFACT_REPOSITORIES = ('snowflake.snowpark.pypi_shared_repository'); GRANT USAGE ON STREAMLIT KITCHEN_SINK_PROD.APPS.KITCHEN_SINK_RIGHTS_DEMO TO ROLE KS_STREAMLIT_VIEWER;"

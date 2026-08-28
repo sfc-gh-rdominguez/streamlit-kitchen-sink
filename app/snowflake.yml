@@ -1,10 +1,15 @@
 definition_version: 2
+# Target database is templated so the same manifest deploys to staging, prod, or
+# a PR preview db. Default targets staging; override with:
+#   snow streamlit deploy --env target_db=KITCHEN_SINK_PROD
+env:
+  target_db: KITCHEN_SINK_STAGING
 entities:
   rights_demo:
     type: streamlit
     identifier:
       name: KITCHEN_SINK_RIGHTS_DEMO
-      database: KITCHEN_SINK_STAGING
+      database: <% ctx.env.target_db %>
       schema: APPS
     query_warehouse: KS_WH
     runtime_name: SYSTEM$ST_CONTAINER_RUNTIME_PY3_11

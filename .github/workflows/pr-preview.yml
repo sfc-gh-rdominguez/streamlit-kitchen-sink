@@ -1,0 +1,89 @@
+name: PR preview
+
+# Every commit on an open PR (re)builds an isolated preview environment in
+# Snowflake: a transient database, a zero-copy clone of PROD.DATA, and the
+# environment-aware app deployed against it. The preview URL is posted as a PR
+# comment. The environment is torn down by pr-teardown.yml on close/merge.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+env:
+  PR_DB: KITCHEN_SINK_PR_${{ github.event.number }}
+  SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+  KEY: ${{ runner.temp }}/key.p8
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Snowflake CLI
+        run: pip install --upgrade snowflake-cli
+
+      - name: Validate app compiles
+        run: python -m py_compile app/streamlit_app.py
+
+      - name: Write deployer key
+        run: |
+          printf '%s' "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > "$KEY"
+          chmod 600 "$KEY"
+
+      - name: Provision preview environment (transient db + cloned prod data)
+        run: |
+          SNOW="snow sql --temporary-connection --account $SF_ACCOUNT --user $SF_USER --authenticator SNOWFLAKE_JWT --private-key-file $KEY"
+          $SNOW -D pr_db=$PR_DB -f sql/30_cicd/provision_preview.sql
+          $SNOW -D target_db=$PR_DB -D source_db=KITCHEN_SINK_PROD -D owner_role=KS_APP_STAGING -f sql/25_env_refresh/clone_data.sql
+
+      - name: Deploy preview app
+        working-directory: app
+        run: |
+          snow streamlit deploy rights_demo --replace \
+            --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
+            --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" \
+            --role KS_APP_STAGING --env target_db=$PR_DB
+          snow sql --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
+            --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" \
+            -q "USE ROLE KS_APP_STAGING; ALTER STREAMLIT $PR_DB.APPS.KITCHEN_SINK_RIGHTS_DEMO SET ARTIFACT_REPOSITORIES = ('snowflake.snowpark.pypi_shared_repository'); GRANT USAGE ON STREAMLIT $PR_DB.APPS.KITCHEN_SINK_RIGHTS_DEMO TO ROLE KS_STREAMLIT_VIEWER;"
+
+      - name: Get preview URL
+        id: url
+        working-directory: app
+        run: |
+          URL=$(snow streamlit get-url rights_demo \
+            --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
+            --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" \
+            --role KS_APP_STAGING --env target_db=$PR_DB)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = "${{ steps.url.outputs.url }}".trim();
+            const marker = "### ❄️ Preview environment";
+            const body = `${marker}\n\n[Open the preview app](${url})`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }

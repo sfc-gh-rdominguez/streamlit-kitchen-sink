@@ -1,0 +1,36 @@
+name: PR preview teardown
+
+# When a PR is closed (merged or not), drop its transient preview database.
+# The KS_DEPLOYER service role owns the PR database, so it can drop it.
+
+on:
+  pull_request:
+    types: [closed]
+
+env:
+  PR_DB: KITCHEN_SINK_PR_${{ github.event.number }}
+  SF_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SF_USER: ${{ secrets.SNOWFLAKE_USER }}
+  KEY: ${{ runner.temp }}/key.p8
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Snowflake CLI
+        run: pip install --upgrade snowflake-cli
+
+      - name: Write deployer key
+        run: |
+          printf '%s' "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > "$KEY"
+          chmod 600 "$KEY"
+
+      - name: Drop preview database
+        run: |
+          snow sql --temporary-connection --account "$SF_ACCOUNT" --user "$SF_USER" \
+            --authenticator SNOWFLAKE_JWT --private-key-file "$KEY" \
+            -q "USE ROLE KS_APP_DEPLOYER; DROP DATABASE IF EXISTS $PR_DB;"
