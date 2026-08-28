@@ -17,7 +17,7 @@ graph TD
     SYSADMIN --> KS_APP_ADMIN
 
     subgraph build["Build / deploy / ownership"]
-        KS_APP_DEVELOPER["KS_APP_DEVELOPER<br/>creates/owns the DEV app"]
+        KS_APP_STAGING["KS_APP_STAGING<br/>creates/owns the DEV app"]
         KS_APP_DEPLOYER["KS_APP_DEPLOYER<br/>CI/CD service role"]
         KS_APP_OWNER_PROD["KS_APP_OWNER_PROD<br/>owns the PROD app"]
     end
@@ -28,7 +28,7 @@ graph TD
         KS_SALES_LEADERSHIP["KS_SALES_LEADERSHIP"]
     end
 
-    KS_APP_ADMIN --> KS_APP_DEVELOPER
+    KS_APP_ADMIN --> KS_APP_STAGING
     KS_APP_ADMIN --> KS_APP_DEPLOYER
     KS_APP_ADMIN --> KS_APP_OWNER_PROD
     KS_APP_ADMIN --> KS_SALES_EAST
@@ -49,14 +49,14 @@ operator can test-view the app as any region.
 | `KS_SALES_WEST` | Data | Business role — West sales | same, West |
 | `KS_SALES_LEADERSHIP` | Data | Business role — sales leadership | same, all regions |
 | `KS_APP_ADMIN` | Build | Governance; inherits all functional roles | (inherits everything) |
-| `KS_APP_DEVELOPER` | Build | Creates/owns the **dev** app | OWNERSHIP on `KITCHEN_SINK_DEV.APPS`, `CREATE STREAMLIT`, `USAGE` on `KS_WH` + pool |
+| `KS_APP_STAGING` | Build | Creates/owns the **staging** app | OWNERSHIP on `KITCHEN_SINK_STAGING.APPS`, `CREATE STREAMLIT`, `USAGE` on `KS_WH` + pool |
 | `KS_APP_DEPLOYER` | Build | CI/CD service role | `CREATE STREAMLIT` + `USAGE` on **both** `APPS` schemas, warehouse, pool |
 | `KS_APP_OWNER_PROD` | Build | Owns the **prod** app | OWNERSHIP on `KITCHEN_SINK_PROD.APPS`, warehouse, pool |
 
 ### Why this shape
 
 - **Lock down who can build.** `CREATE STREAMLIT` is a schema-level privilege
-  held only by the dedicated build roles — `KS_APP_DEVELOPER` (and the schema
+  held only by the dedicated build roles — `KS_APP_STAGING` (and the schema
   ownership it has in dev), `KS_APP_DEPLOYER`, and `KS_APP_OWNER_PROD` in prod.
   It is *not* granted to `KS_STREAMLIT_VIEWER`, business roles, or `PUBLIC`, so a
   user who can open every app still cannot create or modify one.
@@ -86,7 +86,7 @@ operator can test-view the app as any region.
 
 | Database | Schema | Owner role | Purpose |
 |----------|--------|-----------|---------|
-| `KITCHEN_SINK_DEV` | `APPS` | `KS_APP_DEVELOPER` | development |
+| `KITCHEN_SINK_STAGING` | `APPS` | `KS_APP_STAGING` | development |
 | `KITCHEN_SINK_PROD` | `APPS` | `KS_APP_OWNER_PROD` | production |
 
 Shared query warehouse: `KS_WH` (XSMALL, auto-suspend 60s).

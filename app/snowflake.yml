@@ -4,7 +4,7 @@ entities:
     type: streamlit
     identifier:
       name: KITCHEN_SINK_RIGHTS_DEMO
-      database: KITCHEN_SINK_DEV
+      database: KITCHEN_SINK_STAGING
       schema: APPS
     query_warehouse: KS_WH
     runtime_name: SYSTEM$ST_CONTAINER_RUNTIME_PY3_11

@@ -20,7 +20,7 @@
  *
  *   3. BUILD / DEPLOY / OWNERSHIP
  *      KS_APP_ADMIN (governance; inherits the roles below for testing),
- *      KS_APP_DEVELOPER (dev app owner), KS_APP_DEPLOYER (CI/CD service role),
+ *      KS_APP_STAGING (dev app owner), KS_APP_DEPLOYER (CI/CD service role),
  *      KS_APP_OWNER_PROD (prod app owner).
  *
  * Key idea: entry is broad; data RBAC keeps users seeing only what they may.
@@ -41,7 +41,7 @@ USE ROLE USERADMIN;
 -- Build / deploy / ownership
 CREATE ROLE IF NOT EXISTS KS_APP_ADMIN
   COMMENT = 'Kitchen Sink: governance role; inherits build/deploy + business roles';
-CREATE ROLE IF NOT EXISTS KS_APP_DEVELOPER
+CREATE ROLE IF NOT EXISTS KS_APP_STAGING
   COMMENT = 'Kitchen Sink: creates/owns the DEV Streamlit app';
 CREATE ROLE IF NOT EXISTS KS_APP_DEPLOYER
   COMMENT = 'Kitchen Sink: CI/CD service role; deploys dev and prod';
@@ -66,7 +66,7 @@ CREATE ROLE IF NOT EXISTS KS_SALES_LEADERSHIP
 USE ROLE SECURITYADMIN;
 
 -- Build/deploy roles roll up to the governance role.
-GRANT ROLE KS_APP_DEVELOPER  TO ROLE KS_APP_ADMIN;
+GRANT ROLE KS_APP_STAGING  TO ROLE KS_APP_ADMIN;
 GRANT ROLE KS_APP_DEPLOYER   TO ROLE KS_APP_ADMIN;
 GRANT ROLE KS_APP_OWNER_PROD TO ROLE KS_APP_ADMIN;
 

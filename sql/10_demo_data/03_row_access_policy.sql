@@ -24,7 +24,7 @@ ALTER TABLE SALES_BY_REGION DROP ALL ROW ACCESS POLICIES;
 CREATE OR REPLACE ROW ACCESS POLICY SALES_REGION_POLICY
   AS (region VARCHAR) RETURNS BOOLEAN ->
     -- Owner's-rights path: the app owner role sees all rows.
-    CURRENT_ROLE() IN ('KS_APP_DEVELOPER', 'KS_APP_OWNER_PROD')
+    CURRENT_ROLE() IN ('KS_APP_STAGING', 'KS_APP_OWNER_PROD')
     -- Caller's-rights path: filter by the viewer's entitlement (unqualified ->
     -- resolves within this schema; clone-safe).
     OR EXISTS (

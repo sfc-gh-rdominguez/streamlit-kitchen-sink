@@ -8,7 +8,7 @@ One Streamlit app runs the **same query** through two connections, side by side:
 | Restricted caller's rights | `st.connection("snowflake-callers-rights")` | the **viewer** | only their entitled rows, masked |
 
 The app code is identical on both sides. The difference is produced entirely by
-governance policies on `KITCHEN_SINK_DEV.APPS.SALES_BY_REGION`.
+governance policies on `KITCHEN_SINK_STAGING.DATA.SALES_BY_REGION`.
 
 ## How it works
 
@@ -18,7 +18,7 @@ graph LR
         O["owner's-rights conn"]
         C["caller's-rights conn"]
     end
-    O -->|"CURRENT_ROLE() = KS_APP_DEVELOPER"| P{Row access policy}
+    O -->|"CURRENT_ROLE() = KS_APP_STAGING"| P{Row access policy}
     C -->|"CURRENT_USER() = viewer"| P
     P -->|owner role| ALL["all rows"]
     P -->|"USER_REGION_MAP lookup"| FILT["viewer's region only"]
@@ -37,7 +37,7 @@ Neither the role nor the user is hardcoded in the app — each connection derive
 identity a different way:
 
 - **Owner's rights** runs as the **owner of the `STREAMLIT` object**
-  (`KS_APP_DEVELOPER`), fixed when the app is deployed. `CURRENT_ROLE()` is that
+  (`KS_APP_STAGING`), fixed when the app is deployed. `CURRENT_ROLE()` is that
   owner role for everyone who opens the app, regardless of who they are.
 - **Restricted caller's rights** runs as the **viewer**. Snowflake mints a
   short-lived viewer token at session start, so `CURRENT_USER()` is whoever
@@ -69,7 +69,7 @@ the owner's caller grants:
 1. the viewer must actually hold `SELECT` on the table (the business roles
    `KS_SALES_*` carry it), **and**
 2. the app owner role must hold a matching **caller grant**
-   (`GRANT CALLER SELECT ON TABLE … TO ROLE KS_APP_DEVELOPER`).
+   (`GRANT CALLER SELECT ON TABLE … TO ROLE KS_APP_STAGING`).
 
 Either alone is not enough — the caller grant only *permits* the app to use a
 privilege the viewer already has.

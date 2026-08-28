@@ -11,7 +11,7 @@ contrast: the owner role sees every row unmasked; a caller sees only their
 entitled region with the rep name masked.
 
 The app is environment-agnostic: it queries the DATA schema of its OWN database
-(KITCHEN_SINK_DEV or KITCHEN_SINK_PROD), so the same code promotes dev -> prod
+(KITCHEN_SINK_STAGING, KITCHEN_SINK_PROD, or a PR preview db), so the same code promotes
 unchanged. Requires a container runtime (caller's rights isn't in the warehouse
 runtime).
 """
