@@ -12,6 +12,14 @@ Everything is created by SQL under `sql/` and driven by the
 
 Have fun!
 
+## Who this is for
+
+The people who *govern* a Snowflake account — data platform leads, architects,
+and admins — not the citizen developers themselves. It's about how to **enable
+and govern** app authorship and sharing across an org, not how to write a
+Streamlit app. Where citizen developers show up, it's as the people you're
+enabling, described in the third person.
+
 ## Prerequisites
 
 - [**Snowflake

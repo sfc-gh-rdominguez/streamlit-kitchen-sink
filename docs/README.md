@@ -18,7 +18,10 @@ reinventing RBAC.
 We talk to engineering and business leaders who are struggling with striking a
 balance between opening up access and authorship to Citizen Developers, and
 ensuring both the integrity and governance of data across these sprawling
-application libraries.
+application libraries. **These docs are written for those people** — the ones
+who govern the account and enable everyone else, not the citizen developers
+themselves. Citizen developers show up throughout, but as the people you're
+enabling.
 
 This repo is my answer, and it doubles as a home for the practices that tend to
 come up in the same breath: 

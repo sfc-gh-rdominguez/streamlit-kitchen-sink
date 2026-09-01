@@ -38,6 +38,15 @@ citizen-dev model spends it on *getting out of the way*. So every time this
 chapter relaxes a rule the earlier ones enforced, it's doing it on purpose —
 the stakes are simply different.
 
+And getting out of the way means meeting these builders where they already are.
+The analyst who wants a quick dashboard is not going to clone a repo, wire up a
+local `streamlit run`, or learn the Git dance from the [CI/CD chapter](03-cicd.md)
+— nor should they have to. They want to open a browser, write some Python, and
+watch it run. That instinct isn't laziness; it's the right amount of process for
+an app nobody's quarter depends on. So the rest of this chapter really has two
+audiences: a **platform team** that stands up a safe sandbox once, and a
+**citizen dev** who then never leaves Snowsight.
+
 ## The conflict
 
 Look at the ladder a would-be builder can climb in
@@ -235,13 +244,24 @@ roles"), and because these apps are disposable, granting to somebody's personal
 role is cheap and forgettable in the good way. If you're going to hand-share to
 individuals, share to *people-shaped* roles, not *app-shaped* ones.
 
-### The workspace version that actually opens this up
+But for a throwaway app, reaching for object grants at all is often the wrong
+frame. These builders aren't deploying governed objects and granting them out —
+they're working somewhere the question barely comes up.
 
-There's a better answer for this exact case, though, and it's a
-[shared workspace](https://docs.snowflake.com/en/user-guide/ui-snowsight/workspaces-shared).
-Instead of deploying a `STREAMLIT` object and hunting for a role to grant it to,
-you drop the app in a shared workspace and give your collaborator access. Three
-things fall out of that, all in your favor:
+## Where they'd rather work: the workspace
+
+Here's what a citizen dev actually wants, stated plainly: no Git, no
+`connections.toml`, no local `streamlit run`, no CLI. They want to open
+[a Snowsight workspace](https://docs.snowflake.com/en/user-guide/ui-snowsight/workspaces-shared),
+add a Streamlit app, write Python in the browser, and press **Run** — which
+spins up a private *development app* only they can see, the in-platform
+equivalent of localhost with none of the setup. When it's ready, **Deploy** turns
+it into a Streamlit object. The whole Git-and-laptop apparatus from the earlier
+chapters is precisely the thing they're opting out of.
+
+A *shared* workspace turns that into a team sport, and — happily — it's also the
+cleanest answer to the "one person" question above. Three things fall out of it,
+all in your favor:
 
 - **They run it as themselves.** Anyone with access to a shared workspace runs
   the app *with their own privileges*, not the owner's. That quietly deletes the
@@ -278,12 +298,49 @@ business role they actually belong to, or a dedicated QA role seeded with test
 rows through the row policy. Break that one coupling and the missing middle rung
 appears on its own.
 
+## Try it
+
+Remember the two audiences — and which one you are. **Your citizen devs** do none
+of the commands below; they open a workspace, write an app, press Run, then
+Deploy into the sandbox schema you've prepared for them. **You** — the platform
+team — run the recipes here once: the one-time scaffolding that makes that
+sandbox safe, the schema, the managed access, the grants. The recipes are the
+enablement; the workspace is their workflow.
+
+Assuming the foundation is already up (`just setup <conn>` — the `KS_*` roles and
+`KS_WH` are all it needs; the sandbox brings its own data), the whole thing stands
+up in three commands:
+
+```sh
+just citizen-setup <conn>    # SANDBOX.EAST + SANDBOX.WEST, managed-access, granted to the business roles
+just citizen-deploy <conn>   # deploy the owner's-rights app as each team's own role
+just citizen-verify <conn>   # watch the fence hold
+```
+
+`citizen-setup` creates a `SANDBOX` database with a managed-access schema per
+team, grants `CREATE STREAMLIT` on each to the matching business role, and seeds
+each team its own `SALES` table with `SELECT` granted only to that role — the
+object grant *is* the boundary, no row policy in sight. `citizen-deploy` then
+deploys the identical `app_citizen/streamlit_app.py` twice: once as
+`KS_SALES_EAST` into `SANDBOX.EAST`, once as `KS_SALES_WEST` into `SANDBOX.WEST`.
+Each role owns the app it deploys. (In real life a citizen dev wouldn't run this —
+they'd press **Deploy** in their workspace, targeting the same `SANDBOX.<team>`
+schema. The recipe is just the scriptable stand-in so the whole demo runs without
+clicking through the UI.)
+
+`citizen-verify` is where the argument turns into output. It shows the East role
+reading East, then flatly denied on West; it shows that role *failing* to `GRANT
+USAGE` on its own app — managed access won't let a builder self-share — and then
+the schema owner doing that same grant successfully. Build on your data, share to
+your team, and let the schema own the sharing.
+
+`just citizen-teardown <conn>` drops the `SANDBOX` database when you're done; the
+curated `KITCHEN_SINK` environments and the `KS_*` roles are left untouched.
+
 ## Next Up
 
-There's no SQL behind this chapter *yet* — it's the one corner of the repo still
-living on a whiteboard rather than in a `just` recipe. The obvious next move is a
-`SANDBOX` database with a managed-access schema per team, `CREATE STREAMLIT`
-granted to `KS_SALES_EAST`, and a throwaway owner's-rights app that visibly reads
-East and *fails* to reach West — the boundary holding in practice, right next to
-the caller's-rights demo from earlier. Until that lands, head back to the [docs
-index](README.md).
+That's both ends of the spectrum living in one repo: a curated app promoted
+through environments behind a gate, and a citizen-dev app that lives fast and
+cheap on its owner's own grants. Head back to the [docs index](README.md) — or go
+poke at [`sql/40_citizen_dev/`](../sql/40_citizen_dev/) and
+[`app_citizen/`](../app_citizen/), which should read like the rest by now.
