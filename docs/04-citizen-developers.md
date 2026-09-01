@@ -42,7 +42,7 @@ And getting out of the way means meeting these builders where they already are.
 The analyst who wants a quick dashboard is not going to clone a repo, wire up a
 local `streamlit run`, or learn the Git dance from the [CI/CD chapter](03-cicd.md)
 — nor should they have to. They want to open a browser, write some Python, and
-watch it run. That instinct isn't laziness; it's the right amount of process for
+watch it run. That instinct is the right amount of process for
 an app nobody's quarter depends on. So the rest of this chapter really has two
 audiences: a **platform team** that stands up a safe sandbox once, and a
 **citizen dev** who then never leaves Snowsight.
@@ -176,8 +176,8 @@ on a sandbox schema is the whole shopping list.
 
 ## Wait — can the builder just share it themselves?
 
-This is the question that decides whether you can actually *sleep at night* with
-this model, so let's be blunt: by default, yes. When a citizen dev creates a
+This is the question that decides whether you can *sleep at night* with this
+model. By default, the answer is yes. When a citizen dev creates a
 Streamlit their role becomes its owner, and in Snowflake ownership carries the
 right to grant privileges on the thing you own — full stop. There's no separate
 "sharing" privilege to withhold, and you don't need any privilege on the *target*
@@ -193,8 +193,8 @@ For an owner's-rights app that's the leak, undisguised: the grantee runs it *as
 the owner* and sees East data. The one accidental brake is that they also need
 `USAGE` on the containing database, schema, and warehouse or compute pool to
 open it — but that's friction, not a fence, and a dev who owns the sandbox schema
-can grant the schema `USAGE` right alongside. So the honest default is an
-uncomfortable one: a citizen dev can share their app with anyone, up to and
+can grant the schema `USAGE` right alongside. So the default is an uncomfortable
+one: a citizen dev can share their app with anyone, up to and
 including the entire account.
 
 ### The lever: a managed-access sandbox schema
@@ -228,8 +228,8 @@ schema owner disposes.
 
 ## "Can I just share it with one person?"
 
-This is the single most common question I get about all of this, and the honest
-first answer is a letdown: **Snowflake doesn't share with people. It shares with
+This is the single most common question I get about all of this, and the first
+answer is a letdown: **Snowflake doesn't share with people. It shares with
 roles.** There's no `GRANT USAGE … TO USER bob` — privileges land on roles, and
 you put Bob in a role. So "share this app with exactly one colleague" has no
 native one-liner; taken literally it means "spin up a role whose only member is
@@ -250,7 +250,7 @@ they're working somewhere the question barely comes up.
 
 ## Where they'd rather work: the workspace
 
-Here's what a citizen dev actually wants, stated plainly: no Git, no
+A citizen dev wants none of the machinery: no Git, no
 `connections.toml`, no local `streamlit run`, no CLI. They want to open
 [a Snowsight workspace](https://docs.snowflake.com/en/user-guide/ui-snowsight/workspaces-shared),
 add a Streamlit app, write Python in the browser, and press **Run** — which
@@ -341,6 +341,8 @@ curated `KITCHEN_SINK` environments and the `KS_*` roles are left untouched.
 
 That's both ends of the spectrum living in one repo: a curated app promoted
 through environments behind a gate, and a citizen-dev app that lives fast and
-cheap on its owner's own grants. Head back to the [docs index](README.md) — or go
-poke at [`sql/40_citizen_dev/`](../sql/40_citizen_dev/) and
-[`app_citizen/`](../app_citizen/), which should read like the rest by now.
+cheap on its owner's own grants. What happens when one of those cheap little apps
+turns out to be indispensable? That's [the next chapter](05-promotion.md) — the
+on-ramp from sandbox to business-critical. Or head back to the [docs
+index](README.md), or go poke at [`sql/40_citizen_dev/`](../sql/40_citizen_dev/)
+and [`app_citizen/`](../app_citizen/), which should read like the rest by now.
