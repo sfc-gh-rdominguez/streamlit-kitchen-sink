@@ -130,12 +130,17 @@ outright. Because the preview database is transient and nothing else depends on
 it, teardown is a single `DROP DATABASE` — no orphaned apps, no lingering
 clones, no quarterly hunt for "what is this and can I delete it."
 
-
----
+## Next Up
 
 And that's the whole loop: a change starts in an editor, proves itself in an
 ephemeral preview, rehearses in staging, and lands in prod behind a single human
 "yes" — with the same app artifact the entire way and a least-privilege robot
-doing the driving. Head back to the [docs index](README.md) if you want to start
-over, or go read the SQL and the workflows themselves — at this point they
-should read like old friends.
+doing the driving. Go read the SQL and the workflows themselves — at this point
+they should read like old friends.
+
+That's the curated model end to end: a small team shipping the handful of apps
+the whole company leans on. It has nothing to say, though, to the analyst who
+just wants to build something on the numbers they can *already* see. The [next
+chapter](04-citizen-developers.md) turns the shape inside out — self-service
+authorship for citizen developers, bounded not by a pipeline but by the grants
+they already hold.

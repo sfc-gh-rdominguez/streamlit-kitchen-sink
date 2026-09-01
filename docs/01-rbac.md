@@ -143,7 +143,8 @@ destroyed in conjunction with the lifecycle of a PR.
 ## Next Up
 
 Everything so far has been foundational to answer the question: how do we share
-an application? Next, we'll look at how to ensure that - regardless of who the
+an application? The [next chapter](02-rights-model.md) looks at how to ensure
+that - regardless of who the
 application is shared with - anyone who opens the application will only be able
 to see the data they're allowed to see: one app, shared to everyone via
 `KS_STREAMLIT_VIEWER`, running the *same query* through an owner's-rights
