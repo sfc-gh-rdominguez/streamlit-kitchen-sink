@@ -1,0 +1,21 @@
+definition_version: 2
+# One artifact, one per team. The same file deploys the EAST and WEST sandbox
+# apps; the team (and the role you deploy as) are the only things that change:
+#   snow streamlit deploy sandbox_app --role KS_SALES_EAST --env team=EAST --replace
+#   snow streamlit deploy sandbox_app --role KS_SALES_WEST --env team=WEST --replace
+env:
+  team: EAST
+entities:
+  sandbox_app:
+    type: streamlit
+    identifier:
+      name: KITCHEN_SINK_SANDBOX_<% ctx.env.team %>
+      database: SANDBOX
+      schema: <% ctx.env.team %>
+    # Owner's-rights only, so the simpler warehouse runtime is enough — no
+    # compute pool, no PyPI mirror, no external access integration. Lower
+    # ceremony to match an app that isn't business-critical.
+    query_warehouse: KS_WH
+    main_file: streamlit_app.py
+    artifacts:
+      - streamlit_app.py
