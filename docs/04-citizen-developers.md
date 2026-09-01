@@ -253,7 +253,9 @@ they're working somewhere the question barely comes up.
 A citizen dev wants none of the machinery: no Git, no
 `connections.toml`, no local `streamlit run`, no CLI. They want to open
 [a Snowsight workspace](https://docs.snowflake.com/en/user-guide/ui-snowsight/workspaces-shared),
-add a Streamlit app, write Python in the browser, and press **Run** — which
+add a Streamlit app, write Python in the browser — or just describe the app to
+[Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code)
+(CoCo) and let it write the Python for them — and press **Run**, which
 spins up a private *development app* only they can see, the in-platform
 equivalent of localhost with none of the setup. When it's ready, **Deploy** turns
 it into a Streamlit object. The whole Git-and-laptop apparatus from the earlier
@@ -301,11 +303,11 @@ appears on its own.
 ## Try it
 
 Remember the two audiences — and which one you are. **Your citizen devs** do none
-of the commands below; they open a workspace, write an app, press Run, then
-Deploy into the sandbox schema you've prepared for them. **You** — the platform
-team — run the recipes here once: the one-time scaffolding that makes that
-sandbox safe, the schema, the managed access, the grants. The recipes are the
-enablement; the workspace is their workflow.
+of the commands below; they open a workspace, write an app (or let CoCo write it
+for them), press Run, then Deploy into the sandbox schema you've prepared for
+them. **You** — the platform team — run the recipes here once: the one-time
+scaffolding that makes that sandbox safe, the schema, the managed access, the
+grants. The recipes are the enablement; the workspace is their workflow.
 
 Assuming the foundation is already up (`just setup <conn>` — the `KS_*` roles and
 `KS_WH` are all it needs; the sandbox brings its own data), the whole thing stands
