@@ -183,7 +183,7 @@ them with no external access integration and no trip to the internet.
 The objects behind this pattern are created by the SQL under `sql/10_demo_data/`
 and `sql/20_caller_grants/` — built in prod by `just data-prod`, cloned down to
 staging by `just refresh-staging`, and shared by `just deploy`. So far you've
-been running those recipes by hand against one connection. The [final
+been running those recipes by hand against one connection. The [next
 chapter](03-cicd.md) hands the whole routine to GitHub Actions: code promoted up
 through environments, data cloned down, and a throwaway preview environment spun
 up for every pull request.

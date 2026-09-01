@@ -290,7 +290,7 @@ is already doing the per-person part for you.
 
 None of the existing setup has to come out. The two models sit side by side:
 curated production apps keep flowing through `KS_APP_ADMIN` and the CI/CD from
-the [final chapter](03-cicd.md), while citizen-dev apps live in sandbox schemas
+the [CI/CD chapter](03-cicd.md), while citizen-dev apps live in sandbox schemas
 under business roles. The single habit worth dropping is the "inherit every
 business role so I can test as any region" shortcut. Test-viewing shouldn't
 require the *builder* role to be omniscient — let people test by assuming a
