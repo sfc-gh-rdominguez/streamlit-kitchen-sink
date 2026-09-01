@@ -44,6 +44,45 @@ deploy connection:
   cd app && snow streamlit deploy rights_demo -c {{connection}} --role KS_APP_STAGING --replace
   snow sql -c {{connection}} -q "USE ROLE KS_APP_STAGING; ALTER STREAMLIT KITCHEN_SINK_STAGING.APPS.KITCHEN_SINK_RIGHTS_DEMO SET ARTIFACT_REPOSITORIES = ('snowflake.snowpark.pypi_shared_repository'); GRANT USAGE ON STREAMLIT KITCHEN_SINK_STAGING.APPS.KITCHEN_SINK_RIGHTS_DEMO TO ROLE KS_STREAMLIT_VIEWER;"
 
+# --- Citizen-developer sandbox (the other end of the spectrum) --------------
+# Ephemeral, not-business-critical apps a business role builds on its OWN data.
+# Owner's rights + a managed-access sandbox schema; no CI/CD, no staging, no
+# gated promotion. Requires the foundation (`just setup`) for the KS_* roles and
+# KS_WH; brings its own data, so `just data-prod` is not needed.
+
+# Stand up a SANDBOX.<team> managed-access schema per team, grant CREATE
+# STREAMLIT to the team's business role, and seed each team's own SALES table
+# (SELECT granted only to that role — the object grant is the fence).
+
+citizen-setup connection:
+  snow sql -c {{connection}} -D team=EAST -D role=KS_SALES_EAST -f sql/40_citizen_dev/00_sandbox.sql
+  snow sql -c {{connection}} -D team=WEST -D role=KS_SALES_WEST -f sql/40_citizen_dev/00_sandbox.sql
+  snow sql -c {{connection}} -D team=EAST -D role=KS_SALES_EAST -f sql/40_citizen_dev/01_sandbox_data.sql
+  snow sql -c {{connection}} -D team=WEST -D role=KS_SALES_WEST -f sql/40_citizen_dev/01_sandbox_data.sql
+
+# Deploy the same owner's-rights app as each team's role, into that team's
+# sandbox schema. The role owns the app it deploys.
+
+citizen-deploy connection:
+  cd app_citizen && snow streamlit deploy sandbox_app -c {{connection}} --role KS_SALES_EAST --env team=EAST --replace
+  cd app_citizen && snow streamlit deploy sandbox_app -c {{connection}} --role KS_SALES_WEST --env team=WEST --replace
+
+# Prove the model as the East role ALONE. `USE SECONDARY ROLES NONE` is
+# essential: without it, a privileged operator's other roles (SYSADMIN, etc.)
+# leak in as secondary roles and mask what KS_SALES_EAST can really do. Lines
+# prefixed `-` are expected to fail — that's the point.
+
+citizen-verify connection:
+  snow sql -c {{connection}} -q "USE ROLE KS_SALES_EAST; USE SECONDARY ROLES NONE; USE WAREHOUSE KS_WH; SELECT COUNT(*) AS EAST_ROWS_VISIBLE FROM SANDBOX.EAST.SALES;"
+  -snow sql -c {{connection}} -q "USE ROLE KS_SALES_EAST; USE SECONDARY ROLES NONE; USE WAREHOUSE KS_WH; SELECT COUNT(*) FROM SANDBOX.WEST.SALES;"
+  -snow sql -c {{connection}} -q "USE ROLE KS_SALES_EAST; USE SECONDARY ROLES NONE; GRANT USAGE ON STREAMLIT SANDBOX.EAST.KITCHEN_SINK_SANDBOX_EAST TO ROLE KS_SALES_WEST;"
+  snow sql -c {{connection}} -q "USE ROLE SYSADMIN; GRANT USAGE ON STREAMLIT SANDBOX.EAST.KITCHEN_SINK_SANDBOX_EAST TO ROLE KS_SALES_WEST;"
+
+# Drop the sandbox. The KITCHEN_SINK databases and KS_* roles are untouched.
+
+citizen-teardown connection:
+  snow sql -c {{connection}} -q "USE ROLE SYSADMIN; DROP DATABASE IF EXISTS SANDBOX;"
+
 # WARNING: drops the KITCHEN_SINK databases, the KS_WH warehouse, and every KS_*
 # role. There is no undo.
 

@@ -12,6 +12,20 @@ Everything is created by SQL under `sql/` and driven by the
 
 Have fun!
 
+## Who this is for
+
+The people who *govern* a Snowflake account — data platform leads, architects,
+and admins — not the citizen developers themselves. It's about how to **enable
+and govern** app authorship and sharing across an org, not how to write a
+Streamlit app. Where citizen developers show up, it's as the people you're
+enabling, described in the third person.
+
+The [**`docs/`**](docs/README.md) directory is the heart of this repo — start
+there. It's written to be read start to finish, building from the role hierarchy
+up through the rights model and into CI/CD, so each pattern sets up the next.
+The code here is really just the worked example behind that story; the docs are
+where it's explained.
+
 ## Prerequisites
 
 - [**Snowflake
@@ -42,10 +56,3 @@ just teardown my_connection   # WARNING: drops all databases, the warehouse, and
 
 Run `just` with no arguments to list every recipe.
 
-## Documentation
-
-The [**`docs/`**](docs/README.md) directory is the heart of this repo — start
-there. It's written to be read start to finish, building from the role hierarchy
-up through the rights model and into CI/CD, so each pattern sets up the next. The
-code here is really just the worked example behind that story; the docs are where
-it's explained.
