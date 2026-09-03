@@ -312,8 +312,12 @@ all in your favor:
   the app *with their own privileges*, not the owner's. That quietly deletes the
   owner's-rights leak from the last two sections — there's no deployed
   owner's-rights object handing over the builder's data, because every person
-  executes under their own grants. Leave the row policy on the table and each
-  viewer sees precisely their slice, for free.
+  executes under their own grants. In the sandbox as built, that means the
+  **object grant is the fence**: a viewer holding the team's `SELECT` sees the
+  team's rows, and anyone who doesn't sees nothing at all. (Put a row access
+  policy on the table too, as the curated tables have, and that same
+  run-as-yourself execution slices each viewer down to their own rows within it —
+  but that's additive, not required.)
 - **You're sharing code, not a governed asset.** A shared workspace is a
   wiki-style space with per-file drafts, publish, and a publish history you can
   roll back through — about the right amount of ceremony for something meant to
@@ -326,10 +330,12 @@ The catch — there's always one — is that workspace access is *still* granted
 roles, not individuals; you pick roles when you create or configure a shared
 workspace. So the workspace doesn't conjure per-user grants any more than the
 deployed object did. What it does is make the granularity **stop mattering**:
-because everyone runs as themselves against a per-user row policy, sharing the
-workspace a shade too broadly leaks nothing. That's the real resolution to "how
-do I share with one person" — you mostly stop needing to, because the data layer
-is already doing the per-person part for you.
+because everyone runs as themselves, an over-broad workspace share leaks nothing
+— a viewer who lacks the team's grant can't read the table no matter how widely
+the workspace was shared. That's the real resolution to "how do I share with one
+person" — you mostly stop needing to, because the fence is each viewer's own
+access, not the reach of the share. (And where the base table also carries a row
+access policy, that same execution trims each viewer to their own rows on top.)
 
 ## The one thing you'd change
 
