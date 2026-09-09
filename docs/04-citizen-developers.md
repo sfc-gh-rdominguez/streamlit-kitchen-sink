@@ -147,6 +147,49 @@ Each lane is self-contained: the arrows never cross, so East's app *cannot* read
 West's rows no matter who opens it. A fourth team — `KS_SALES_CENTRAL`, say — is
 one more lane, not a redesign.
 
+### Why not caller's rights?
+
+If you've read the [rights-model chapter](02-rights-model.md), the obvious
+objection is: the curated apps use caller's rights, so why flip citizen-dev apps
+to owner's? Caller's rights even looks *safer* on the one axis owner's rights is
+weak on — a West user who opens an East caller's-rights app would see nothing,
+where the same over-share of an owner's-rights app leaks East data. So why not
+reach for it here?
+
+The first thing to know is that the choice isn't symmetric. Streamlit in
+Snowflake has **no plain, unrestricted caller's-rights mode** — apps run with
+owner's rights by default, and the only alternative is *restricted* caller's
+rights, which the curated model uses. And "restricted" comes with strings that
+land squarely on the thing this chapter is trying to make self-service:
+
+- **It re-centralizes authorship.** Restricted caller's rights only lets an app
+  touch an object on the viewer's behalf once an admin holding `MANAGE CALLER
+  GRANTS` has issued a **caller grant** for it (`GRANT CALLER SELECT ON TABLE …`).
+  So the citizen dev can't just build on data they can already see — every table
+  their app reads needs a privileged operator to bless it first. That's the exact
+  central plumbing the sandbox recipe deletes: with owner's rights, the builder's
+  *existing* `SELECT` is the whole story.
+- **The app stops working uniformly.** The data boundary becomes each *viewer's*
+  grants, so two people on the same team with slightly different access get
+  different results — or errors. The builder can't test once and trust it works
+  for everyone. Owner's rights is deterministic: every viewer sees exactly what
+  the builder saw.
+- **It's runtime-coupled.** Restricted caller's rights runs only in the container
+  runtime (and needs a recent Streamlit version); owner's rights works there
+  *and* in warehouse runtimes. A dev pressing **Deploy** shouldn't have to reason
+  about which one they're on.
+
+The over-share edge caller's rights seems to win is one you've already bought
+elsewhere — the managed-access schema below fences *who* an app reaches, and
+leaving the row policy on the base tables makes an accidental over-share degrade
+gracefully instead of spilling the lot. And the classic caller's-rights *danger*
+— untrusted app code running with a privileged caller's full rights — doesn't
+apply either: Snowflake only offers the *restricted* variant, and a narrow owner
+caps the blast radius anyway. So caller's rights would buy you no safety you
+don't already have, in exchange for dragging a `MANAGE CALLER GRANTS` operator
+back into the middle of every app. Owner's rights isn't the reckless choice here;
+it's the one that keeps authorship self-service.
+
 ## Where the tension moves
 
 Decentralizing authorship doesn't make the tension disappear; it moves it from
@@ -269,8 +312,12 @@ all in your favor:
   the app *with their own privileges*, not the owner's. That quietly deletes the
   owner's-rights leak from the last two sections — there's no deployed
   owner's-rights object handing over the builder's data, because every person
-  executes under their own grants. Leave the row policy on the table and each
-  viewer sees precisely their slice, for free.
+  executes under their own grants. In the sandbox as built, that means the
+  **object grant is the fence**: a viewer holding the team's `SELECT` sees the
+  team's rows, and anyone who doesn't sees nothing at all. (Put a row access
+  policy on the table too, as the curated tables have, and that same
+  run-as-yourself execution slices each viewer down to their own rows within it —
+  but that's additive, not required.)
 - **You're sharing code, not a governed asset.** A shared workspace is a
   wiki-style space with per-file drafts, publish, and a publish history you can
   roll back through — about the right amount of ceremony for something meant to
@@ -283,10 +330,12 @@ The catch — there's always one — is that workspace access is *still* granted
 roles, not individuals; you pick roles when you create or configure a shared
 workspace. So the workspace doesn't conjure per-user grants any more than the
 deployed object did. What it does is make the granularity **stop mattering**:
-because everyone runs as themselves against a per-user row policy, sharing the
-workspace a shade too broadly leaks nothing. That's the real resolution to "how
-do I share with one person" — you mostly stop needing to, because the data layer
-is already doing the per-person part for you.
+because everyone runs as themselves, an over-broad workspace share leaks nothing
+— a viewer who lacks the team's grant can't read the table no matter how widely
+the workspace was shared. That's the real resolution to "how do I share with one
+person" — you mostly stop needing to, because the fence is each viewer's own
+access, not the reach of the share. (And where the base table also carries a row
+access policy, that same execution trims each viewer to their own rows on top.)
 
 ## The one thing you'd change
 

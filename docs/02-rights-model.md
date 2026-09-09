@@ -148,6 +148,26 @@ You grant someone access by adding them to the table with a region (or `ALL`).
 That's the whole governance argument of this repo in one sentence: **app access
 is broad, but data entitlement is precise and lives in the data layer.**
 
+**Why key on the user, and not the role?** At first glance this cuts against
+chapter one's "reuse the roles you already have" — so it's worth naming the line
+the two fall on. Your business roles still do all the *object* gating: holding
+`KS_SALES_EAST` is what lets you `SELECT` the table at all. The entitlement table
+only decides *which rows* come back once you're in. And it keys on
+`CURRENT_USER()` rather than `CURRENT_ROLE()` on purpose — under caller's rights a
+viewer arrives with only their **default** role active (secondary roles are lit
+up separately, and the mask deliberately reads the *primary* role). A role-keyed
+row policy would therefore hand back different rows depending on which role
+happened to be primary. Keying on the user sidesteps that entirely: one answer
+per person, regardless of which role is active.
+
+The fair worry is that this is now a *second* thing to keep in step with role
+membership. Treat it as a **projection** of the truth you already have, not a
+rival to it: in a real deployment `USER_REGION_MAP` is fed from the same identity
+source that drives your role grants — the IdP or HR feed — so a team change moves
+both together. It's a two-row `INSERT` here because this is a demo; keeping that
+projection honest at scale is a governance concern in its own right, and gets its
+own chapter later.
+
 ```sql
 CREATE TABLE USER_REGION_MAP (
   username  VARCHAR,   -- matches CURRENT_USER()

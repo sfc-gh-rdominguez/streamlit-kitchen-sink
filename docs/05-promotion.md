@@ -141,11 +141,17 @@ point each app at the right end of the spectrum.
 
 ## Next Up
 
-That closes the loop. The repo now covers the whole arc: a [role
+That closes the conceptual loop. The repo now covers the whole arc: a [role
 hierarchy](01-rbac.md) that shares broadly and governs at the data layer, the
 [rights model](02-rights-model.md) that makes it safe, the [CI/CD](03-cicd.md)
 that promotes the curated apps, a [citizen-dev
 sandbox](04-citizen-developers.md) for the ideas that haven't earned all that
-yet — and this chapter, the on-ramp between the two. Head back to the [docs
-index](README.md), or go read the code; at this point the left and right columns
-should both look familiar.
+yet — and this chapter, the on-ramp between the two.
+
+Which leaves one question: convinced, but where do you actually start? The [next
+chapter](06-implementation.md) turns all of this into a phased rollout plan — a
+doing-order with a demoable win and a retrospective you can check off at every
+milestone, so you can show progress from the first week without betting the
+company on a big-bang migration. Or head back to the [docs index](README.md) and
+go read the code; at this point the left and right columns should both look
+familiar.
