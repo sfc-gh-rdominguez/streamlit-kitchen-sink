@@ -23,8 +23,8 @@ who govern the account and enable everyone else, not the citizen developers
 themselves. Citizen developers show up throughout, but as the people you're
 enabling.
 
-This repo is my answer, and it doubles as a home for the practices that tend to
-come up in the same breath: 
+This repo is my answer to all the questions we see on a regular basis, and it
+doubles as a home for the practices that tend to come up in the same breath: 
 - Creating a scalable and sustainable role hierarchy that supports data
 governance and application visibility & development
 - Giving analysts and DEs a sane local-dev loop
@@ -32,18 +32,21 @@ governance and application visibility & development
 
 Here, we attempt to demonstrate best practices without oversimplifying: 
 
-Picture a sales org with one modest table — `SALES_BY_REGION` — and a handful of
-people who want to look at it: East reps who should see East, West reps who
-should see West, and leadership who gets the whole picture. Someone builds a
-Streamlit app to show it off, it works, and then everyone else wants one too.
+Our hypothetical scenario is a sales org with one modest table —
+`SALES_BY_REGION` — and a handful of people who want to look at it: East reps
+who should see East, West reps who should see West, and leadership who gets the
+whole picture. Someone builds a Streamlit app to show it off, it works, and then
+everyone else wants one too.
 
-That's the moment the real question shows up, and it's never "how do I write the
-app?" — it's "how do I let everyone *open* it without letting everyone *see
-everything*?" These docs walk through one answer to that question, built out in
-full so you can read it, run it, and steal the parts you like: a role hierarchy
-that shares broadly but governs at the data layer, the owner's-rights vs.
-caller's-rights trick that makes it safe, and the CI/CD that promotes it through
-environments on its own.
+That's the moment the real question shows up. Never have we been asked, "how do
+I write the app?" — it's "how do I let everyone *open* it without letting
+everyone *see everything*?" or "how do we make this scale so _anyone_ in the org
+can do this?" These docs walk through one answer to these questions, built out
+in full so you can read it, run it, and steal the parts you like: a role
+hierarchy that shares broadly but governs at the data layer, the owner's-rights
+vs. caller's-rights trick that makes it safe, the CI/CD that promotes it through
+environments on its own, and a guide to help you understand _how_ to implement
+this in your organization.
 
 Is this meant to be a copy-pasta solution to your current situation? If only
 life were that easy. These are - at their heart - reference architectures that

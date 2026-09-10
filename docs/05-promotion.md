@@ -11,13 +11,13 @@ granting it to everyone hands every viewer the builder's data — the exact leak
 [chapter two](02-rights-model.md) spent its whole length warning about. "Share
 it wider" is how a good idea becomes an incident.
 
-The real answer is that promotion is a **re-platforming** — you
-move the idea out of the incubator and rebuild it inside the curated model from
-the first three chapters. The good news: you've already built everything it
-needs to land in. This chapter is the bridge between the two ends of the repo,
-and the nice part is you can read it as a literal diff between two files that
-already exist: [`app_citizen/streamlit_app.py`](../app_citizen/streamlit_app.py)
-on the left, [`app/streamlit_app.py`](../app/streamlit_app.py) on the right.
+The real answer is that promotion is a **re-platforming** — you move the idea
+out of the incubator and rebuild it inside the curated model from the first
+three chapters. The good news: you've already built everything it needs to land
+in. This chapter is the bridge between the two ends of the repo, and the nice
+part is you can read it as a literal diff between two files that already exist:
+[`app_citizen/streamlit_app.py`](../app_citizen/streamlit_app.py) on the left,
+[`app/streamlit_app.py`](../app/streamlit_app.py) on the right.
 
 ## Promotion isn't `GRANT OWNERSHIP`
 
@@ -61,9 +61,9 @@ per-viewer-sensitive.
 
 ## The move, column to column
 
-Taking the per-viewer-sensitive path, here's the sandbox
-app becoming the curated app, piece by piece. Every piece on the right already
-exists in this repo:
+Taking the per-viewer-sensitive path, here's the sandbox app becoming the
+curated app, piece by piece. Every piece on the right already exists in this
+repo:
 
 - **Repoint the data.** The sandbox app reads `SANDBOX.<team>.SALES`, a
 self-contained partition it was granted. The promoted app reads the governed
@@ -89,13 +89,12 @@ gate.
 - **Share broadly, then decommission.** `GRANT USAGE … TO ROLE
 KS_STREAMLIT_VIEWER`, and drop the sandbox Streamlit. The incubator did its job.
 
-The promoted app is a **different deployed
-object**, not the sandbox object with a setting toggled. You don't flip a
-Streamlit from owner's rights to caller's rights in place — you deploy the
-curated version into `KITCHEN_SINK_*.APPS` and retire the sandbox one. The logic
-carries; the shell is rebuilt.
+The promoted app is a **different deployed object**, not the sandbox object with
+a setting toggled. You don't flip a Streamlit from owner's rights to caller's
+rights in place — you deploy the curated version into `KITCHEN_SINK_*.APPS` and
+retire the sandbox one. The logic carries; the shell is rebuilt.
 
-## The seams (where this actually gets hard)
+## The hard bits
 
 - **The code rarely survives untouched.** A sandbox app written to run as an
 owner over its own table quietly assumes "I can see everything in here." Under

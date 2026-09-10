@@ -22,30 +22,31 @@ we've built so far.
 
 One framing the rest of the chapter leans on: **these apps are not
 business-critical.** The curated apps from the first three chapters carry the
-company — they earn CI/CD, a staging rehearsal, a gated prod deploy, an immutable
-artifact promoted through environments, precisely because when one breaks,
-something that matters breaks. Citizen-dev apps sit at the opposite end of that
-spectrum: an analyst's exploratory dashboard, a team's throwaway view of this
-quarter's numbers, the thing somebody spins up on Tuesday and has forgotten by
-Friday. Ephemeral, personal-to-small-group, and — the important part — nobody's
-payroll run depends on them.
+company — they earn CI/CD, a staging rehearsal, a gated prod deploy, an
+immutable artifact promoted through environments, precisely because when one
+breaks, something that matters breaks. Citizen-dev apps sit at the opposite end
+of that spectrum: an analyst's exploratory dashboard, a team's throwaway view of
+this quarter's numbers, the thing somebody spins up on Tuesday and has forgotten
+by Friday. Ephemeral, personal-to-small-group, and — the important part —
+nobody's payroll run depends on them.
 
 That single property is what licenses everything below. You don't wrap a
 disposable app in a promotion pipeline, and you don't need to: the blast radius
-of a mistake is a handful of people looking at data they were already entitled to
-see. Where the curated model spends its complexity budget on *governance*, the
-citizen-dev model spends it on *getting out of the way*. So every time this
-chapter relaxes a rule the earlier ones enforced, it's doing it on purpose —
-the stakes are simply different.
+of a mistake is a handful of people looking at data they were already entitled
+to see. Where the curated model spends its complexity budget on *governance*,
+the citizen-dev model spends it on *getting out of the way*. So every time this
+chapter relaxes a rule the earlier ones enforced, it's doing it on purpose — the
+stakes are simply different.
 
 And getting out of the way means meeting these builders where they already are.
 The analyst who wants a quick dashboard is not going to clone a repo, wire up a
-local `streamlit run`, or learn the Git dance from the [CI/CD chapter](03-cicd.md)
-— nor should they have to. They want to open a browser, write some Python, and
-watch it run. That instinct is the right amount of process for
-an app nobody's quarter depends on. So the rest of this chapter really has two
-audiences: a **platform team** that stands up a safe sandbox once, and a
-**citizen dev** who then never leaves Snowsight.
+local `streamlit run`, or learn the Git dance from the [CI/CD
+chapter](03-cicd.md) — nor should they have to. They want to open a browser,
+write some Python (or, better yet: have an LLM do it for them), and watch it
+run. That instinct is the right amount of process for an app nobody's quarter
+depends on. So the rest of this chapter really has two audiences: a **platform
+team** that stands up a safe sandbox once, and a **citizen dev** who then never
+leaves Snowsight.
 
 ## The conflict
 
@@ -54,14 +55,14 @@ Look at the ladder a would-be builder can climb in
 exactly two rungs, and neither one fits a citizen developer:
 
 - **A build role** (`KS_APP_STAGING`, `KS_APP_DEPLOYER`, `KS_APP_OWNER_PROD`)
-  can create apps but carries zero data grants of its own. That's deliberate —
-  the curated apps read data through the *viewer's* caller's rights, so the
-  builder never needs any. But it also means a citizen dev handed a build role
-  can't build on *their* data at all; the role can't `SELECT` a thing.
+can create apps but carries zero data grants of its own. That's deliberate — the
+curated apps read data through the *viewer's* caller's rights, so the builder
+never needs any. But it also means a citizen dev handed a build role can't build
+on *their* data at all; the role can't `SELECT` a thing.
 - **`KS_APP_ADMIN`** can build *and* see data — but only because it inherits
-  *every* business role (`01_roles.sql` grants `KS_SALES_EAST`, `KS_SALES_WEST`,
-  and `KS_SALES_LEADERSHIP` straight into it). Hand that to a citizen dev and
-  you've minted a regional-data superuser.
+*every* business role (`01_roles.sql` grants `KS_SALES_EAST`, `KS_SALES_WEST`,
+and `KS_SALES_LEADERSHIP` straight into it). Hand that to a citizen dev and
+you've minted a regional-data superuser.
 
 There's no rung in between — nothing that says "can create apps, bounded to the
 data this person already has." That missing middle is the whole problem, and it
@@ -84,10 +85,10 @@ boundary for you.
 So a `KS_SALES_EAST` citizen developer:
 
 - gets `CREATE STREAMLIT ON SCHEMA SANDBOX.EAST` granted to `KS_SALES_EAST`
-  (plus `USAGE` on a warehouse and a compute pool),
+(plus `USAGE` on a warehouse and a compute pool),
 - builds an owner's-rights app owned by `KS_SALES_EAST`,
 - and that app can query exactly — and *only* — what `KS_SALES_EAST` can
-  `SELECT`.
+`SELECT`.
 
 Not because a policy filters it, but because the app runs as their own role and
 their grants *are* the fence. They can't even author an app that references a
@@ -163,21 +164,21 @@ rights, which the curated model uses. And "restricted" comes with strings that
 land squarely on the thing this chapter is trying to make self-service:
 
 - **It re-centralizes authorship.** Restricted caller's rights only lets an app
-  touch an object on the viewer's behalf once an admin holding `MANAGE CALLER
-  GRANTS` has issued a **caller grant** for it (`GRANT CALLER SELECT ON TABLE …`).
-  So the citizen dev can't just build on data they can already see — every table
-  their app reads needs a privileged operator to bless it first. That's the exact
-  central plumbing the sandbox recipe deletes: with owner's rights, the builder's
-  *existing* `SELECT` is the whole story.
+touch an object on the viewer's behalf once an admin holding `MANAGE CALLER
+GRANTS` has issued a **caller grant** for it (`GRANT CALLER SELECT ON TABLE …`).
+So the citizen dev can't just build on data they can already see — every table
+their app reads needs a privileged operator to bless it first. That's the exact
+central plumbing the sandbox recipe deletes: with owner's rights, the builder's
+*existing* `SELECT` is the whole story.
 - **The app stops working uniformly.** The data boundary becomes each *viewer's*
-  grants, so two people on the same team with slightly different access get
-  different results — or errors. The builder can't test once and trust it works
-  for everyone. Owner's rights is deterministic: every viewer sees exactly what
-  the builder saw.
-- **It's runtime-coupled.** Restricted caller's rights runs only in the container
-  runtime (and needs a recent Streamlit version); owner's rights works there
-  *and* in warehouse runtimes. A dev pressing **Deploy** shouldn't have to reason
-  about which one they're on.
+grants, so two people on the same team with slightly different access get
+different results — or errors. The builder can't test once and trust it works
+for everyone. Owner's rights is deterministic: every viewer sees exactly what
+the builder saw.
+- **It's runtime-coupled.** Restricted caller's rights runs only in the
+container runtime (and needs a recent Streamlit version); owner's rights works
+there *and* in warehouse runtimes. A dev pressing **Deploy** shouldn't have to
+reason about which one they're on.
 
 The over-share edge caller's rights seems to win is one you've already bought
 elsewhere — the managed-access schema below fences *who* an app reaches, and
@@ -187,8 +188,8 @@ gracefully instead of spilling the lot. And the classic caller's-rights *danger*
 apply either: Snowflake only offers the *restricted* variant, and a narrow owner
 caps the blast radius anyway. So caller's rights would buy you no safety you
 don't already have, in exchange for dragging a `MANAGE CALLER GRANTS` operator
-back into the middle of every app. Owner's rights isn't the reckless choice here;
-it's the one that keeps authorship self-service.
+back into the middle of every app. Owner's rights isn't the reckless choice
+here; it's the one that keeps authorship self-service.
 
 ## Where the tension moves
 
@@ -201,30 +202,30 @@ owner's rights sails straight past the viewer's own grants.
 Two things keep that honest:
 
 - **Control who an app can be shared to.** A citizen-dev app should reach only
-  the builder's own business role, never `KS_STREAMLIT_VIEWER` or `PUBLIC`.
-  *Build on your data, share to your team.* Whether that's a polite convention
-  or an actual boundary comes down to how you cut the sandbox schema — which is
-  the whole of the next section.
-- **Leave the row access policy on the base tables.** Then even an owner's-rights
-  app is row-filtered, and an accidental over-share degrades gracefully instead
-  of spilling the lot. It's the same trick from the rights-model chapter: a
-  policy that references its mapping table *unqualified*, so each environment's
-  clone quietly rewires to its own copy.
+the builder's own business role, never `KS_STREAMLIT_VIEWER` or `PUBLIC`. *Build
+on your data, share to your team.* Whether that's a polite convention or an
+actual boundary comes down to how you cut the sandbox schema — which is the
+whole of the next section.
+- **Leave the row access policy on the base tables.** Then even an
+owner's-rights app is row-filtered, and an accidental over-share degrades
+gracefully instead of spilling the lot. It's the same trick from the
+rights-model chapter: a policy that references its mapping table *unqualified*,
+so each environment's clone quietly rewires to its own copy.
 
 And a citizen dev who genuinely needs to share *broadly* while still filtering
-per viewer hasn't discovered a new problem — they've wandered right back into the
-curated model, caller's rights and row policy and all. The tidy part is that in
-that mode they need no special data access to build at all; `CREATE STREAMLIT`
-on a sandbox schema is the whole shopping list.
+per viewer hasn't discovered a new problem — they've wandered right back into
+the curated model, caller's rights and row policy and all. The tidy part is that
+in that mode they need no special data access to build at all; `CREATE
+STREAMLIT` on a sandbox schema is the whole shopping list.
 
 ## Wait — can the builder just share it themselves?
 
 This is the question that decides whether you can *sleep at night* with this
-model. By default, the answer is yes. When a citizen dev creates a
-Streamlit their role becomes its owner, and in Snowflake ownership carries the
-right to grant privileges on the thing you own — full stop. There's no separate
-"sharing" privilege to withhold, and you don't need any privilege on the *target*
-role to grant to it. Nothing at the privilege layer stops this:
+model. By default, the answer is yes. When a citizen dev creates a Streamlit
+their role becomes its owner, and in Snowflake ownership carries the right to
+grant privileges on the thing you own — full stop. There's no separate "sharing"
+privilege to withhold, and you don't need any privilege on the *target* role to
+grant to it. Nothing at the privilege layer stops this:
 
 ```sql
 -- Runs fine for the owner. There is no "share" privilege gating it.
@@ -235,9 +236,9 @@ GRANT USAGE ON STREAMLIT sandbox.east.my_app TO ROLE public;
 For an owner's-rights app that's the leak, undisguised: the grantee runs it *as
 the owner* and sees East data. The one accidental brake is that they also need
 `USAGE` on the containing database, schema, and warehouse or compute pool to
-open it — but that's friction, not a fence, and a dev who owns the sandbox schema
-can grant the schema `USAGE` right alongside. So the default is an uncomfortable
-one: a citizen dev can share their app with anyone, up to and
+open it — but that's friction, not a fence, and a dev who owns the sandbox
+schema can grant the schema `USAGE` right alongside. So the default is an
+uncomfortable one: a citizen dev can share their app with anyone, up to and
 including the entire account.
 
 ### The lever: a managed-access sandbox schema
@@ -252,8 +253,8 @@ In a managed-access schema, the grant pen changes hands:
 
 - The citizen dev still creates *and owns* the app — authorship is untouched.
 - But an object owner can no longer grant privileges on their own objects. Only
-  the *schema owner* (or a role holding `MANAGE GRANTS`) can. The dev's `GRANT
-  USAGE …` above simply fails.
+the *schema owner* (or a role holding `MANAGE GRANTS`) can. The dev's `GRANT
+USAGE …` above simply fails.
 
 Which cleanly splits the two verbs you actually care about:
 
@@ -272,20 +273,21 @@ schema owner disposes.
 ## "Can I just share it with one person?"
 
 This is the single most common question I get about all of this, and the first
-answer is a letdown: **Snowflake doesn't share with people. It shares with
-roles.** There's no `GRANT USAGE … TO USER bob` — privileges land on roles, and
-you put Bob in a role. So "share this app with exactly one colleague" has no
+answer feels like a letdown: **Snowflake doesn't share with people. It shares
+with roles.** There's no `GRANT USAGE … TO USER bob` — privileges land on roles,
+and you put Bob in a role. So "share this app with exactly one colleague" has no
 native one-liner; taken literally it means "spin up a role whose only member is
-that colleague," which sounds an awful lot like the per-app-role snarl the [first
-chapter](01-rbac.md) told you to run from.
+that colleague," which sounds an awful lot like the per-app-role snarl the
+[first chapter](01-rbac.md) told you to run from.
 
-The way out is to notice those are *different* snarls. Chapter one warned against
-a viewer role **per app** — mint enough of those and nobody can remember which one
-gates what. A role **per person**, reused across every throwaway app they're ever
-handed, is a different animal; plenty of orgs already run exactly these ("user
-roles"), and because these apps are disposable, granting to somebody's personal
-role is cheap and forgettable in the good way. If you're going to hand-share to
-individuals, share to *people-shaped* roles, not *app-shaped* ones.
+The way out is to notice those are *different* snarls. Chapter one warned
+against a viewer role **per app** — mint enough of those and nobody can remember
+which one gates what. A role **per person**, reused across every throwaway app
+they're ever handed, is a different animal; plenty of orgs already run exactly
+these ("user roles"), and because these apps are disposable, granting to
+somebody's personal role is cheap and forgettable in the good way. If you're
+going to hand-share to individuals, share to *people-shaped* roles, not
+*app-shaped* ones.
 
 But for a throwaway app, reaching for object grants at all is often the wrong
 frame. These builders aren't deploying governed objects and granting them out —
@@ -293,38 +295,38 @@ they're working somewhere the question barely comes up.
 
 ## Where they'd rather work: the workspace
 
-A citizen dev wants none of the machinery: no Git, no
-`connections.toml`, no local `streamlit run`, no CLI. They want to open
-[a Snowsight workspace](https://docs.snowflake.com/en/user-guide/ui-snowsight/workspaces-shared),
+A citizen dev wants none of the machinery: no Git, no `connections.toml`, no
+local `streamlit run`, no CLI. They want to open [a Snowsight
+workspace](https://docs.snowflake.com/en/user-guide/ui-snowsight/workspaces-shared),
 add a Streamlit app, write Python in the browser — or just describe the app to
 [Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code)
-(CoCo) and let it write the Python for them — and press **Run**, which
-spins up a private *development app* only they can see, the in-platform
-equivalent of localhost with none of the setup. When it's ready, **Deploy** turns
-it into a Streamlit object. The whole Git-and-laptop apparatus from the earlier
-chapters is precisely the thing they're opting out of.
+(CoCo) and let it write the Python for them — and press **Run**, which spins up
+a private *development app* only they can see, the in-platform equivalent of
+localhost with none of the setup. When it's ready, **Deploy** turns it into a
+Streamlit object. The whole Git-and-laptop apparatus from the earlier chapters
+is precisely the thing they're opting out of.
 
 A *shared* workspace turns that into a team sport, and — happily — it's also the
 cleanest answer to the "one person" question above. Three things fall out of it,
 all in your favor:
 
 - **They run it as themselves.** Anyone with access to a shared workspace runs
-  the app *with their own privileges*, not the owner's. That quietly deletes the
-  owner's-rights leak from the last two sections — there's no deployed
-  owner's-rights object handing over the builder's data, because every person
-  executes under their own grants. In the sandbox as built, that means the
-  **object grant is the fence**: a viewer holding the team's `SELECT` sees the
-  team's rows, and anyone who doesn't sees nothing at all. (Put a row access
-  policy on the table too, as the curated tables have, and that same
-  run-as-yourself execution slices each viewer down to their own rows within it —
-  but that's additive, not required.)
+the app *with their own privileges*, not the owner's. That quietly deletes the
+owner's-rights leak from the last two sections — there's no deployed
+owner's-rights object handing over the builder's data, because every person
+executes under their own grants. In the sandbox as built, that means the
+**object grant is the fence**: a viewer holding the team's `SELECT` sees the
+team's rows, and anyone who doesn't sees nothing at all. (Put a row access
+policy on the table too, as the curated tables have, and that same
+run-as-yourself execution slices each viewer down to their own rows within it —
+but that's additive, not required.)
 - **You're sharing code, not a governed asset.** A shared workspace is a
-  wiki-style space with per-file drafts, publish, and a publish history you can
-  roll back through — about the right amount of ceremony for something meant to
-  be thrown away. No pipeline, no immutable artifact, no prod schema.
+wiki-style space with per-file drafts, publish, and a publish history you can
+roll back through — about the right amount of ceremony for something meant to be
+thrown away. No pipeline, no immutable artifact, no prod schema.
 - **Deploy stays locked down.** Only the workspace *owner* role can promote a
-  `STREAMLIT` object out of it, so "a few people can collaborate and run" never
-  quietly turns into "a few people shipped to prod."
+`STREAMLIT` object out of it, so "a few people can collaborate and run" never
+quietly turns into "a few people shipped to prod."
 
 The catch — there's always one — is that workspace access is *still* granted to
 roles, not individuals; you pick roles when you create or configure a shared
@@ -351,16 +353,17 @@ appears on its own.
 
 ## Try it
 
-Remember the two audiences — and which one you are. **Your citizen devs** do none
-of the commands below; they open a workspace, write an app (or let CoCo write it
-for them), press Run, then Deploy into the sandbox schema you've prepared for
-them. **You** — the platform team — run the recipes here once: the one-time
-scaffolding that makes that sandbox safe, the schema, the managed access, the
-grants. The recipes are the enablement; the workspace is their workflow.
+Remember the two audiences — and which one you are. **Your citizen devs** do
+none of the commands below; they open a workspace, write an app (or let CoCo
+write it for them), press Run, then Deploy into the sandbox schema you've
+prepared for them. **You** — the platform team — run the recipes here once: the
+one-time scaffolding that makes that sandbox safe, the schema, the managed
+access, the grants. The recipes are the enablement; the workspace is their
+workflow.
 
-Assuming the foundation is already up (`just setup <conn>` — the `KS_*` roles and
-`KS_WH` are all it needs; the sandbox brings its own data), the whole thing stands
-up in three commands:
+Assuming the foundation is already up (`just setup <conn>` — the `KS_*` roles
+and `KS_WH` are all it needs; the sandbox brings its own data), the whole thing
+stands up in three commands:
 
 ```sh
 just citizen-setup <conn>    # SANDBOX.EAST + SANDBOX.WEST, managed-access, granted to the business roles
@@ -373,27 +376,27 @@ team, grants `CREATE STREAMLIT` on each to the matching business role, and seeds
 each team its own `SALES` table with `SELECT` granted only to that role — the
 object grant *is* the boundary, no row policy in sight. `citizen-deploy` then
 deploys the identical `app_citizen/streamlit_app.py` twice: once as
-`KS_SALES_EAST` into `SANDBOX.EAST`, once as `KS_SALES_WEST` into `SANDBOX.WEST`.
-Each role owns the app it deploys. (In real life a citizen dev wouldn't run this —
-they'd press **Deploy** in their workspace, targeting the same `SANDBOX.<team>`
-schema. The recipe is just the scriptable stand-in so the whole demo runs without
-clicking through the UI.)
+`KS_SALES_EAST` into `SANDBOX.EAST`, once as `KS_SALES_WEST` into
+`SANDBOX.WEST`. Each role owns the app it deploys. (In real life a citizen dev
+wouldn't run this — they'd press **Deploy** in their workspace, targeting the
+same `SANDBOX.<team>` schema. The recipe is just the scriptable stand-in so the
+whole demo runs without clicking through the UI.)
 
 `citizen-verify` is where the argument turns into output. It shows the East role
 reading East, then flatly denied on West; it shows that role *failing* to `GRANT
 USAGE` on its own app — managed access won't let a builder self-share — and then
-the schema owner doing that same grant successfully. Build on your data, share to
-your team, and let the schema own the sharing.
+the schema owner doing that same grant successfully. Build on your data, share
+to your team, and let the schema own the sharing.
 
-`just citizen-teardown <conn>` drops the `SANDBOX` database when you're done; the
-curated `KITCHEN_SINK` environments and the `KS_*` roles are left untouched.
+`just citizen-teardown <conn>` drops the `SANDBOX` database when you're done;
+the curated `KITCHEN_SINK` environments and the `KS_*` roles are left untouched.
 
 ## Next Up
 
 That's both ends of the spectrum living in one repo: a curated app promoted
 through environments behind a gate, and a citizen-dev app that lives fast and
-cheap on its owner's own grants. What happens when one of those cheap little apps
-turns out to be indispensable? That's [the next chapter](05-promotion.md) — the
-on-ramp from sandbox to business-critical. Or head back to the [docs
+cheap on its owner's own grants. What happens when one of those cheap little
+apps turns out to be indispensable? That's [the next chapter](05-promotion.md) —
+the on-ramp from sandbox to business-critical. Or head back to the [docs
 index](README.md), or go poke at [`sql/40_citizen_dev/`](../sql/40_citizen_dev/)
 and [`app_citizen/`](../app_citizen/), which should read like the rest by now.
