@@ -42,38 +42,19 @@ The rest of this chapter walks that path one step at a time.
 
 ## Monday morning: working locally
 
-The foundation — roles, databases, warehouse (`just setup`) and prod's
-source-of-truth data (`just data-prod`) — is stood up **once**, when the project
-is first set up. A dev joining later doesn't touch _any_ of that. They just pull
-down fresh data into staging:
+A dev pours a cup of coffee, sits down at their terminal, and pulls the latest
+changes from `main` before creating a new branch for their latest ticket. They
+spin up the local development server and get a tight feedback loop as they make
+changes.
 
-```sh
-just refresh-staging my_connection
-```
-
-**NB: Coming soon, we'll have guidance for how to create an ephemeral dev
-environment for iterating locally with your own zero-copy clones.**
-
-From there the day-to-day loop runs on their own machine. They drop their dev
-connection into `app/.streamlit/secrets.toml` (a `[connections.snowflake]` block
-— gitignored, never committed) and just run Streamlit:
-
-```sh
-cd app && streamlit run streamlit_app.py
-```
-
-The app opens at `localhost:8501` and hot-reloads on every save — that's the
-real inner loop, editing Python and watching the browser, no deploy round-trip.
-Local is where the bulk of the work happens: layout, queries, business logic.
-
-When you're ready to see it running as a deployed app, you don't push to shared
-staging by hand — you open a pull request and let the pipeline hand you a
-deployed environment of your own.
+When they're ready to see it running as a deployed app, they don't push to
+shared staging by hand — instead, they open a pull request and let the pipeline
+hand them a deployed environment of their own.
 
 ## Opening a PR: a whole environment appears
 
-This is the fun part. The moment the PR opens, `pr-preview` fires and builds a
-complete, disposable environment just for that PR:
+This is the fun part. The moment the PR opens, the `pr-preview` GitHub Action
+fires and builds a complete, disposable environment just for that PR:
 
 - it provisions a **transient** database, `KITCHEN_SINK_PR_<n>`,
 - **zero-copy clones** `PROD.DATA` into it (fresh production data, isolated),
@@ -135,8 +116,8 @@ clones, no quarterly hunt for "what is this and can I delete it."
 And that's the whole loop: a change starts in an editor, proves itself in an
 ephemeral preview, rehearses in staging, and lands in prod behind a single human
 "yes" — with the same app artifact the entire way and a least-privilege robot
-doing the driving. Go read the SQL and the workflows themselves — at this point
-they should read like old friends.
+doing the driving. All of this is available in the SQL migrations in the `data`
+dir.
 
 That's the curated model end to end: a small team shipping the handful of apps
 the whole company leans on. It has nothing to say, though, to the analyst who

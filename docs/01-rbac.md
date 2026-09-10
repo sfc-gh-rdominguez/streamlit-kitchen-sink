@@ -8,7 +8,7 @@ it via a spectrum of runtimes, deployments, and tech stacks; it can live
 _inside_ the perimeter or _outside_ of it on a customer's cloud or (if they're a
 masochist) on-prem.
 
-Let's start by talking about Streamlits, which has just about the lowest barrier
+Let's start by talking about Streamlit, which has just about the lowest barrier
 to entry imaginable for applications. You (or your LLM) can write Python?
 Brilliant - you can write a web app. The very first instinct, when you share a
 Streamlit app in Snowflake, is to create a role for it. `SALES_APP_VIEWER`, say.
@@ -28,7 +28,8 @@ reused across every app you ever ship.
 business roles and row-level security you (hopefully) already have — not by
 whoever happened to click the app.
 
-Keep those three apart and the snarl never forms. Here's what that looks like.
+Keep those three apart and the snarl never forms. Here's an example of what that
+looks like.
 
 ## Three layers, one hierarchy
 
@@ -60,7 +61,7 @@ graph TD
 
 Since this _is_ the "Kitchen Sink" example (and I only have one Snowflake demo
 account) and my OCD dictates I should keep things as organized as possible,
-we'll prefix these objects with `KS_*`.
+we'll prefix these roles and objects with `KS_*`.
 
 On the _application_ side `KS_STREAMLIT_VIEWER` hangs off `PUBLIC`, so
 *everyone* can open the apps — that's the point: visibility. Why not? _Everyone_
@@ -80,6 +81,16 @@ a real viewer would see, without keeping a spreadsheet of test accounts.
 | `KS_APP_STAGING` | Build | Creates/owns the **staging** app | OWNERSHIP on `KITCHEN_SINK_STAGING.APPS`, `CREATE STREAMLIT`, `USAGE` on `KS_WH` + pool |
 | `KS_APP_DEPLOYER` | Build | CI/CD service role | `CREATE STREAMLIT` + `USAGE` on **both** `APPS` schemas, warehouse, pool |
 | `KS_APP_OWNER_PROD` | Build | Owns the **prod** app | OWNERSHIP on `KITCHEN_SINK_PROD.APPS`, warehouse, pool |
+
+>[!NOTE] 
+> 
+> You'll notice that we're taking a _very_ governed approach in this
+>setup. However, there _is_ an alternative path that opens the doors much wider
+>for existing business or functional roles in your Snowflake instance. You can
+>[peek ahead](04-citizen-developers.md) at the chapter(s) on Citizen Developers,
+>but I highly encourage you to read through this whole set of docs end-to-end.
+>Why? You'll find this governed approach _and_ the Citizen Developer path go
+>hand-in-hand and can (and _should_!) both be used.
 
 ## Why it's shaped this way
 
@@ -144,9 +155,9 @@ destroyed in conjunction with the lifecycle of a PR.
 
 Everything so far has been foundational to answer the question: how do we share
 an application? The [next chapter](02-rights-model.md) looks at how to ensure
-that - regardless of who the
-application is shared with - anyone who opens the application will only be able
-to see the data they're allowed to see: one app, shared to everyone via
-`KS_STREAMLIT_VIEWER`, running the *same query* through an owner's-rights
-connection and a restricted caller's-rights connection side by side. You'll
-watch the data layer — not the app grant — decide what each viewer sees.
+that - regardless of who the application is shared with - anyone who opens the
+application will only be able to see the data they're allowed to see: one app,
+shared to everyone via `KS_STREAMLIT_VIEWER`, running the *same query* through
+an owner's-rights connection and a restricted caller's-rights connection side by
+side. You'll watch the data layer — not the app grant — decide what each viewer
+sees.

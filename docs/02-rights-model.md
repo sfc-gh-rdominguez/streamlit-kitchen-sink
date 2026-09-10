@@ -149,24 +149,24 @@ That's the whole governance argument of this repo in one sentence: **app access
 is broad, but data entitlement is precise and lives in the data layer.**
 
 **Why key on the user, and not the role?** At first glance this cuts against
-chapter one's "reuse the roles you already have" — so it's worth naming the line
-the two fall on. Your business roles still do all the *object* gating: holding
-`KS_SALES_EAST` is what lets you `SELECT` the table at all. The entitlement table
-only decides *which rows* come back once you're in. And it keys on
-`CURRENT_USER()` rather than `CURRENT_ROLE()` on purpose — under caller's rights a
-viewer arrives with only their **default** role active (secondary roles are lit
-up separately, and the mask deliberately reads the *primary* role). A role-keyed
-row policy would therefore hand back different rows depending on which role
-happened to be primary. Keying on the user sidesteps that entirely: one answer
-per person, regardless of which role is active.
+chapter one's "reuse the roles you already have". Your business roles still do
+all the *object* gating: holding `KS_SALES_EAST` is what lets you `SELECT` the
+table at all. The entitlement table only decides *which rows* come back once
+you're in. And it keys on `CURRENT_USER()` rather than `CURRENT_ROLE()` on
+purpose — under caller's rights a viewer arrives with only their **default**
+role active (secondary roles are lit up separately, and the mask deliberately
+reads the *primary* role). A role-keyed row policy would therefore hand back
+different rows depending on which role happened to be primary. Keying on the
+user sidesteps that entirely: one answer per person, regardless of which role is
+active.
 
 The fair worry is that this is now a *second* thing to keep in step with role
 membership. Treat it as a **projection** of the truth you already have, not a
-rival to it: in a real deployment `USER_REGION_MAP` is fed from the same identity
-source that drives your role grants — the IdP or HR feed — so a team change moves
-both together. It's a two-row `INSERT` here because this is a demo; keeping that
-projection honest at scale is a governance concern in its own right, and gets its
-own chapter later.
+rival to it: in a real deployment `USER_REGION_MAP` is fed from the same
+identity source that drives your role grants — the IdP or HR feed — so a team
+change moves both together. It's a two-row `INSERT` here because this is a demo;
+keeping that projection honest at scale is a governance concern in its own
+right, and will get its own chapter later.
 
 ```sql
 CREATE TABLE USER_REGION_MAP (
@@ -186,24 +186,15 @@ SQL in this repo applies all of them so you don't have to remember them — but
 here they are, so that when you adapt this to your own tables you know which
 knobs matter:
 
-- **Container runtime** (`SYSTEM$ST_CONTAINER_RUNTIME_PY3_11`) — restricted
-caller's rights simply isn't available in the warehouse runtime.
+- **Container runtime** — restricted caller's rights simply isn't available in
+the warehouse runtime.
 - **`READ SESSION` on the owner role** — so `CURRENT_USER()` and row access
 policies resolve correctly inside a Streamlit in Snowflake app.
 - **Caller grants**, delegated via `MANAGE CALLER GRANTS` to `KS_APP_ADMIN` —
 the owner-side half of the intersection above.
-- **A declared `pyproject.toml`** resolved from the built-in Snowflake PyPI
-mirror (`snowflake.snowpark.pypi_shared_repository`). A container app overrides
-the runtime's default packages, so it has to declare its own — including
-`streamlit>=1.53.1`, the floor for caller's rights — and the mirror installs
-them with no external access integration and no trip to the internet.
 
 ## Next Up
 
-The objects behind this pattern are created by the SQL under `sql/10_demo_data/`
-and `sql/20_caller_grants/` — built in prod by `just data-prod`, cloned down to
-staging by `just refresh-staging`, and shared by `just deploy`. So far you've
-been running those recipes by hand against one connection. The [next
-chapter](03-cicd.md) hands the whole routine to GitHub Actions: code promoted up
-through environments, data cloned down, and a throwaway preview environment spun
-up for every pull request.
+The [next chapter](03-cicd.md) hands the whole routine to GitHub Actions: code
+promoted up through environments, data cloned down, and a throwaway preview
+environment spun up for every pull request.
